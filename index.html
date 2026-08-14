@@ -55,6 +55,7 @@ body{font-family:-apple-system,"Apple SD Gothic Neo","Noto Sans KR","Malgun Goth
 .tab-card + .tab-card{margin-top:12px;}
 .tab-card.corner-first{border-radius:0 var(--radius) var(--radius) var(--radius);}
 .tab-card.corner-last{border-radius:var(--radius) 0 var(--radius) var(--radius);}
+.tab-card.compact{padding-bottom:16px;min-height:0;}
 
 /* ── 버튼 ── */
 .btn-primary{width:100%;height:46px;border-radius:14px;background:var(--accent);color:#fff;border:none;font-size:16px;font-weight:700;}
@@ -136,10 +137,65 @@ body{font-family:-apple-system,"Apple SD Gothic Neo","Noto Sans KR","Malgun Goth
 .cache-stat:last-of-type{border-bottom:none;}
 
 .hidden{display:none !important;}
+
+/* ── 골프장 검토 탭: 그룹 선택 칩 ── */
+.chip-row{display:flex;gap:7px;overflow-x:auto;padding-bottom:2px;}
+.chip-row::-webkit-scrollbar{display:none;}
+.group-chip{flex-shrink:0;padding:8px 14px;border-radius:20px;background:var(--bg);border:1.5px solid var(--line);font-size:13px;font-weight:700;color:var(--sub);white-space:nowrap;}
+.group-chip.active{background:var(--accent);border-color:var(--accent);color:#fff;}
+
+/* ── 잠금 화면 (My-Vault 패턴) ── */
+#lockScreen{position:fixed;inset:0;background:linear-gradient(150deg,#4C46D6 0%,#5B54E8 45%,#8B5CF6 100%);display:flex;flex-direction:column;align-items:center;padding:max(env(safe-area-inset-top),48px) 24px max(env(safe-area-inset-bottom),96px);z-index:50;color:#fff;}
+.lock-title{font-size:24px;font-weight:800;letter-spacing:-0.3px;margin-top:7vh;}
+.lock-sub{margin-top:10px;font-size:13px;color:rgba(255,255,255,.78);font-weight:600;min-height:18px;text-align:center;}
+.dots{display:flex;gap:14px;margin:28px 0 34px;}
+.dot{width:14px;height:14px;border-radius:50%;border:2px solid rgba(255,255,255,.65);background:transparent;transition:transform .12s ease,background .12s ease;}
+.dot.filled{background:#fff;transform:scale(1.08);}
+.dots.shake{animation:shake .38s;}
+@keyframes shake{0%,100%{transform:translateX(0);}20%{transform:translateX(-10px);}40%{transform:translateX(9px);}60%{transform:translateX(-7px);}80%{transform:translateX(5px);}}
+.keypad{display:grid;grid-template-columns:repeat(3,72px);gap:18px 22px;margin-top:auto;}
+.key{width:72px;height:72px;border-radius:50%;background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.28);color:#fff;font-size:26px;font-weight:600;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(6px);}
+.key:active{background:rgba(255,255,255,.3);}
+.key.empty{background:transparent;border:none;}
+.key.back{font-size:30px;}
+.fp-btn{margin-top:34px;width:72px;height:72px;border-radius:50%;background:transparent;border:none;color:#fff;font-size:46px;display:flex;align-items:center;justify-content:center;}
+.fp-btn:active{opacity:.55;}
+.fp-btn.pulse{animation:pulse .5s ease;}
+@keyframes pulse{0%{transform:scale(1)}50%{transform:scale(1.18)}100%{transform:scale(1)}}
+
+/* PIN 변경용 미니 키패드 */
+.pc-sub{text-align:center;font-size:13px;color:var(--sub);font-weight:600;min-height:18px;margin-bottom:4px;}
+.pc-dots{display:flex;gap:12px;justify-content:center;margin:18px 0 22px;}
+.pc-dot{width:12px;height:12px;border-radius:50%;border:2px solid var(--line-strong);background:transparent;transition:transform .12s ease,background .12s ease;}
+.pc-dot.filled{background:var(--accent);border-color:var(--accent);transform:scale(1.08);}
+.pc-dots.shake{animation:shake .38s;}
+.pc-keypad{display:grid;grid-template-columns:repeat(3,64px);gap:14px 18px;justify-content:center;margin:10px auto 4px;}
+.pc-key{width:64px;height:64px;border-radius:50%;background:var(--bg);border:1px solid var(--line);color:var(--ink);font-size:22px;font-weight:600;display:flex;align-items:center;justify-content:center;}
+.pc-key:active{background:var(--accent-soft);}
+.pc-key.empty{background:transparent;border:none;}
+.pc-key.back{font-size:18px;}
 </style>
 </head>
 <body>
-<div id="app">
+
+<!-- 잠금 화면 -->
+<div id="lockScreen">
+  <div class="lock-title">My Golf</div>
+  <div class="lock-sub" id="lockSub">PIN 6자리를 입력하세요</div>
+  <div class="dots" id="lockDots">
+    <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+    <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+  </div>
+  <div class="keypad" id="lockKeypad">
+    <button class="key" data-k="1">1</button><button class="key" data-k="2">2</button><button class="key" data-k="3">3</button>
+    <button class="key" data-k="4">4</button><button class="key" data-k="5">5</button><button class="key" data-k="6">6</button>
+    <button class="key" data-k="7">7</button><button class="key" data-k="8">8</button><button class="key" data-k="9">9</button>
+    <button class="key empty"></button><button class="key" data-k="0">0</button><button class="key back" data-k="back"><i class="ti ti-backspace-filled"></i></button>
+  </div>
+  <button class="fp-btn" id="fpBtn"><i class="ti ti-fingerprint"></i></button>
+</div>
+
+<div id="app" class="hidden">
 
   <div class="app-header">
     <div class="header-icon"><img src="/icons/icon-192.png" alt="My Golf"></div>
@@ -148,23 +204,32 @@ body{font-family:-apple-system,"Apple SD Gothic Neo","Noto Sans KR","Malgun Goth
   </div>
 
   <div class="tab-bar">
-    <div class="tab-item active" onclick="switchTab('review')"><i class="ti ti-clipboard-check"></i>검토하기</div>
+    <div class="tab-item active" onclick="switchTab('groups')"><i class="ti ti-users"></i>그룹 관리</div>
+    <div class="tab-item" onclick="switchTab('review')"><i class="ti ti-clipboard-check"></i>골프장 검토</div>
     <div class="tab-item" onclick="switchTab('history')"><i class="ti ti-history"></i>이력</div>
   </div>
 
   <div class="screens">
-    <!-- ═══ 검토하기 ═══ -->
-    <div id="screen-review" class="screen active">
+    <!-- ═══ 그룹 관리 ═══ -->
+    <div id="screen-groups" class="screen active">
       <div class="tab-card corner-first">
         <div id="groupListWrap"></div>
         <button class="add-member-btn" style="margin-top:10px;" onclick="openGroupSheet()" type="button"><i class="ti ti-plus"></i>새 모임 만들기</button>
+      </div>
+    </div>
+
+    <!-- ═══ 골프장 검토 ═══ -->
+    <div id="screen-review" class="screen">
+      <div class="tab-card compact">
+        <div class="ctrl-label" style="margin-top:0;">그룹 선택</div>
+        <div class="chip-row" id="groupChipRow"></div>
       </div>
 
       <div id="reviewBody">
         <div class="tab-card">
           <div class="empty-state">
             <i class="ti ti-map-pin-off"></i>
-            위에서 모임을 선택하거나<br>새로 만들어 후보를 찾아보세요
+            위에서 그룹을 선택하세요<br>(그룹이 없다면 그룹 관리 탭에서 먼저 만들어주세요)
           </div>
         </div>
       </div>
@@ -187,10 +252,6 @@ body{font-family:-apple-system,"Apple SD Gothic Neo","Noto Sans KR","Malgun Goth
     <label>모임 이름</label>
     <input id="groupNameInput" type="text" placeholder="예: 주말 라운딩">
   </div>
-  <div class="field-row">
-    <label>예정 날짜 (선택)</label>
-    <input id="groupDateInput" type="date">
-  </div>
   <div class="ctrl-label" style="margin-top:0;">동행자</div>
   <div id="memberRowsWrap"></div>
   <button class="add-member-btn" onclick="addMemberRow()" type="button"><i class="ti ti-plus"></i>동행자 추가</button>
@@ -211,6 +272,31 @@ body{font-family:-apple-system,"Apple SD Gothic Neo","Noto Sans KR","Malgun Goth
   <button class="btn-secondary" style="margin-top:12px;width:100%;justify-content:center;" onclick="clearAllCache()">
     <i class="ti ti-trash"></i>캐시 전체 초기화
   </button>
+
+  <div class="ctrl-label">보안 (이 기기에만 적용, 서버 전송 없음)</div>
+  <button class="btn-secondary" style="width:100%;justify-content:center;margin-bottom:8px;" onclick="openPinChangeSheet()">
+    <i class="ti ti-key"></i>PIN 변경
+  </button>
+  <button class="btn-secondary" id="settingsFingerprintBtn" style="width:100%;justify-content:center;" onclick="toggleFingerprintSetting()">
+    <i class="ti ti-fingerprint"></i>지문 등록
+  </button>
+</div>
+
+<!-- PIN 변경 / 지문 등록 확인 -->
+<div class="sheet" id="pinChangeSheet">
+  <div class="handle"></div>
+  <div class="sheet-title" id="pcTitle">현재 PIN 입력</div>
+  <div class="pc-sub" id="pcSub">잠금 해제에 사용 중인 PIN을 입력하세요</div>
+  <div class="pc-dots" id="pcDots">
+    <span class="pc-dot"></span><span class="pc-dot"></span><span class="pc-dot"></span>
+    <span class="pc-dot"></span><span class="pc-dot"></span><span class="pc-dot"></span>
+  </div>
+  <div class="pc-keypad" id="pcKeypad">
+    <button class="pc-key" data-k="1">1</button><button class="pc-key" data-k="2">2</button><button class="pc-key" data-k="3">3</button>
+    <button class="pc-key" data-k="4">4</button><button class="pc-key" data-k="5">5</button><button class="pc-key" data-k="6">6</button>
+    <button class="pc-key" data-k="7">7</button><button class="pc-key" data-k="8">8</button><button class="pc-key" data-k="9">9</button>
+    <button class="pc-key empty"></button><button class="pc-key" data-k="0">0</button><button class="pc-key back" data-k="back"><i class="ti ti-backspace"></i></button>
+  </div>
 </div>
 
 <!-- 골프장 상세 (지도 마커 클릭 시) -->
@@ -289,8 +375,8 @@ let kakaoMapsLoadPromise = null;
 /* ══════════════════════════════
    탭 전환
 ══════════════════════════════ */
-const TABS = ['review', 'history'];
-let currentTab = 'review';
+const TABS = ['groups', 'review', 'history'];
+let currentTab = 'groups';
 let tabSwitching = false;
 function switchTab(t) {
   if (t === currentTab || tabSwitching) return;
@@ -318,7 +404,7 @@ function switchTab(t) {
 
   // 지도(카카오맵)는 컨테이너가 display:none인 상태에서 생성하면 크기를 0으로 읽어
   // 깨지므로, 화면이 .active(display:block)가 된 뒤에 렌더링한다.
-  if (t === 'review') renderReviewBody();
+  if (t === 'review') { renderGroupChips(); renderReviewBody(); }
   if (t === 'history') renderHistory();
 
   void newScreen.offsetWidth;
@@ -453,17 +539,16 @@ function renderGroupList() {
   }
   wrap.innerHTML = groups.map(g => {
     const preview = g.members.map(m => `${m.name}(${m.addr || '동네 미입력'})`).join(', ');
-    const sel = g.id === selectedGroupId;
     return `
-    <div class="group-card ${sel ? 'selected' : ''}" onclick="selectGroup('${g.id}')">
+    <div class="group-card">
       <div class="group-card-top">
         <div class="group-name">${escapeHtml(g.name)}</div>
         <div class="group-actions">
-          <button class="icon-btn neutral labeled" onclick="event.stopPropagation();openGroupSheet('${g.id}')"><i class="ti ti-pencil"></i>수정</button>
-          <button class="icon-btn labeled" onclick="event.stopPropagation();deleteGroup('${g.id}')"><i class="ti ti-trash"></i>삭제</button>
+          <button class="icon-btn neutral labeled" onclick="openGroupSheet('${g.id}')"><i class="ti ti-pencil"></i>수정</button>
+          <button class="icon-btn labeled" onclick="deleteGroup('${g.id}')"><i class="ti ti-trash"></i>삭제</button>
         </div>
       </div>
-      <div class="group-members">${g.members.length}명 · ${escapeHtml(preview)}${g.scheduledDate ? ` · 예정일 ${formatDateShort(g.scheduledDate)}` : ''}</div>
+      <div class="group-members">${g.members.length}명 · ${escapeHtml(preview)}${g.createdAt ? ` · 등록일 ${formatDateShort(g.createdAt)}` : ''}</div>
     </div>`;
   }).join('');
 }
@@ -480,20 +565,14 @@ function formatDateShort(isoDate) { // "YYYY-MM-DD" -> "M/D"
 function dateToYYYYMMDD(isoDate) { // "YYYY-MM-DD" -> "YYYYMMDD"
   return isoDate ? isoDate.replace(/-/g, '') : null;
 }
-
-function selectGroup(id) {
-  selectedGroupId = id;
-  save('mygolf_selectedGroup', selectedGroupId);
-  renderGroupList();
-  renderReviewBody();
-  document.getElementById('reviewBody').scrollIntoView({ behavior: 'smooth', block: 'start' });
-}
+function todayISO() { return new Date().toISOString().slice(0, 10); }
 
 function deleteGroup(id) {
   groups = groups.filter(g => g.id !== id);
   save('mygolf_groups', groups);
   if (selectedGroupId === id) { selectedGroupId = null; save('mygolf_selectedGroup', null); }
   renderGroupList();
+  renderGroupChips();
   renderReviewBody();
   toast('모임을 삭제했습니다');
 }
@@ -504,7 +583,6 @@ function openGroupSheet(id) {
   const g = id ? groups.find(x => x.id === id) : null;
   document.getElementById('groupSheetTitle').textContent = g ? '모임 수정' : '모임 만들기';
   document.getElementById('groupNameInput').value = g ? g.name : '';
-  document.getElementById('groupDateInput').value = g ? (g.scheduledDate || '') : '';
   const wrap = document.getElementById('memberRowsWrap');
   wrap.innerHTML = '';
   const members = g ? g.members : [{ name: '', addr: '' }, { name: '', addr: '' }];
@@ -527,7 +605,6 @@ function addMemberRow(name = '', addr = '') {
 function saveGroup() {
   const name = document.getElementById('groupNameInput').value.trim();
   if (!name) { toast('모임 이름을 입력하세요'); return; }
-  const scheduledDate = document.getElementById('groupDateInput').value || null; // "YYYY-MM-DD" 또는 null
   const rows = [...document.querySelectorAll('#memberRowsWrap .member-row')];
   const members = rows.map(r => {
     const [nameEl, addrEl] = r.querySelectorAll('input');
@@ -538,17 +615,15 @@ function saveGroup() {
   let group;
   if (editingGroupId) {
     group = groups.find(x => x.id === editingGroupId);
-    group.name = name; group.members = members; group.scheduledDate = scheduledDate;
+    group.name = name; group.members = members;
   } else {
-    group = { id: uid(), name, members, scheduledDate };
+    group = { id: uid(), name, members, createdAt: todayISO() };
     groups.push(group);
   }
   save('mygolf_groups', groups);
-  selectedGroupId = group.id;
-  save('mygolf_selectedGroup', selectedGroupId);
   closeAllSheets();
   renderGroupList();
-  renderReviewBody();
+  renderGroupChips();
   toast('저장되었습니다');
 }
 
@@ -647,14 +722,40 @@ function buildMemberLabels(members) {
 }
 
 /* ══════════════════════════════
-   검토하기 탭 (모임 선택/생성 → 후보 찾기 → 지도+결과)
+   골프장 검토 탭 (그룹 선택 → 예정 날짜/시설구분 → 후보 찾기 → 지도+결과)
 ══════════════════════════════ */
+function renderGroupChips() {
+  const row = document.getElementById('groupChipRow');
+  if (!row) return;
+  if (groups.length === 0) {
+    row.innerHTML = `<span style="font-size:12px;color:var(--sub);">그룹 관리 탭에서 그룹을 먼저 만들어주세요</span>`;
+    return;
+  }
+  row.innerHTML = groups.map(g =>
+    `<div class="group-chip ${g.id === selectedGroupId ? 'active' : ''}" onclick="selectReviewGroup('${g.id}')">${escapeHtml(g.name)}</div>`
+  ).join('');
+}
+
+function selectReviewGroup(id) {
+  selectedGroupId = id;
+  save('mygolf_selectedGroup', selectedGroupId);
+  renderGroupChips();
+  renderReviewBody();
+}
+
+function setReviewDate(value) {
+  const group = groups.find(g => g.id === selectedGroupId);
+  if (!group) return;
+  group.scheduledDate = value || null;
+  save('mygolf_groups', groups);
+}
+
 function renderReviewBody() {
   const body = document.getElementById('reviewBody');
   const group = groups.find(g => g.id === selectedGroupId);
 
   if (!group) {
-    body.innerHTML = `<div class="tab-card"><div class="empty-state"><i class="ti ti-map-pin-off"></i>위에서 모임을 선택하거나<br>새로 만들어 후보를 찾아보세요</div></div>`;
+    body.innerHTML = `<div class="tab-card"><div class="empty-state"><i class="ti ti-map-pin-off"></i>위에서 그룹을 선택하세요<br>(그룹이 없다면 그룹 관리 탭에서 먼저 만들어주세요)</div></div>`;
     return;
   }
 
@@ -662,8 +763,13 @@ function renderReviewBody() {
 
   body.innerHTML = `
     <div class="tab-card">
-      <div class="ctrl-label" style="margin-top:0;">선택된 모임</div>
-      <div class="course-summary" style="margin-bottom:12px;"><b>${escapeHtml(group.name)}</b> · ${group.members.length}명${group.scheduledDate ? ` · 예정일 ${formatDateShort(group.scheduledDate)}` : ''}</div>
+      <div class="ctrl-label" style="margin-top:0;">선택된 그룹</div>
+      <div class="course-summary" style="margin-bottom:12px;"><b>${escapeHtml(group.name)}</b> · ${group.members.length}명</div>
+
+      <div class="field-row">
+        <label>예정 날짜 (선택)</label>
+        <input id="reviewDateInput" type="date" value="${group.scheduledDate || ''}" onchange="setReviewDate(this.value)">
+      </div>
 
       <div class="ctrl-label">시설 구분</div>
       <div class="segment" id="facilitySeg">
@@ -939,13 +1045,311 @@ function renderHistory() {
 }
 
 /* ══════════════════════════════
+   잠금 (PIN + WebAuthn 지문, My-Vault 패턴 참고)
+   저장은 이 브라우저의 localStorage에만 하고 서버로 전송하지 않는다.
+   My Vault와 달리 골프 데이터 자체를 암호화할 필요는 없으므로,
+   PIN으로 유도한 키로 고정된 "검증용 블록"을 암호화해두고
+   해제 시 이 블록을 복호화할 수 있는지로 PIN 일치 여부만 확인한다
+   (PBKDF2 반복 횟수 덕에 무차별 대입도 느리다).
+══════════════════════════════ */
+const LOCK_SALT_KEY = 'mygolf_lock_salt';
+const LOCK_VERIFIER_KEY = 'mygolf_lock_verifier';
+const FP_ID_KEY = 'mygolf_fp_id';
+const FP_PIN_KEY = 'mygolf_fp_pin';
+const lockEnc = new TextEncoder(), lockDec = new TextDecoder();
+
+function b64(buf) { return btoa(String.fromCharCode(...new Uint8Array(buf))); }
+function unb64(str) { const bin = atob(str); const arr = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i); return arr; }
+function b64url(buf) { return b64(buf).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, ''); }
+function unb64url(str) { str = str.replace(/-/g, '+').replace(/_/g, '/'); while (str.length % 4) str += '='; return unb64(str); }
+
+async function deriveKey(pin, saltB64) {
+  const salt = unb64(saltB64);
+  const baseKey = await crypto.subtle.importKey('raw', lockEnc.encode(pin), 'PBKDF2', false, ['deriveKey']);
+  return crypto.subtle.deriveKey(
+    { name: 'PBKDF2', salt, iterations: 150000, hash: 'SHA-256' },
+    baseKey, { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']
+  );
+}
+async function encryptVerifier(key) {
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const ct = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, lockEnc.encode(JSON.stringify({ ok: true })));
+  return { iv: b64(iv), data: b64(ct) };
+}
+async function verifyPin(pin) {
+  const saltB64 = localStorage.getItem(LOCK_SALT_KEY);
+  const verifierRaw = localStorage.getItem(LOCK_VERIFIER_KEY);
+  if (!saltB64 || !verifierRaw) return false;
+  try {
+    const key = await deriveKey(pin, saltB64);
+    const payload = JSON.parse(verifierRaw);
+    const pt = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: unb64(payload.iv) }, key, unb64(payload.data));
+    return JSON.parse(lockDec.decode(pt)).ok === true;
+  } catch (e) { return false; }
+}
+async function setPin(pin) {
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  const saltB64 = b64(salt);
+  const key = await deriveKey(pin, saltB64);
+  const verifier = await encryptVerifier(key);
+  localStorage.setItem(LOCK_SALT_KEY, saltB64);
+  localStorage.setItem(LOCK_VERIFIER_KEY, JSON.stringify(verifier));
+}
+function hasPinSet() {
+  return !!localStorage.getItem(LOCK_SALT_KEY) && !!localStorage.getItem(LOCK_VERIFIER_KEY);
+}
+
+/* ---------------- WebAuthn 지문 ---------------- */
+function fpIsRegistered() { return !!localStorage.getItem(FP_ID_KEY) && !!localStorage.getItem(FP_PIN_KEY); }
+function fpClear() { localStorage.removeItem(FP_ID_KEY); localStorage.removeItem(FP_PIN_KEY); }
+function fpUserId() { return lockEnc.encode('mygolf-fp-user'); }
+
+async function registerFingerprint(pin) {
+  if (!window.PublicKeyCredential) { toast('이 기기는 지문 인증을 지원하지 않습니다'); return false; }
+  try {
+    const cred = await navigator.credentials.create({
+      publicKey: {
+        challenge: crypto.getRandomValues(new Uint8Array(32)),
+        rp: { name: 'My Golf' },
+        user: { id: fpUserId(), name: 'mygolf-user', displayName: 'My Golf' },
+        pubKeyCredParams: [{ type: 'public-key', alg: -7 }, { type: 'public-key', alg: -257 }],
+        authenticatorSelection: { authenticatorAttachment: 'platform', residentKey: 'required', requireResidentKey: true, userVerification: 'required' },
+        timeout: 60000
+      }
+    });
+    if (!cred) return false;
+    localStorage.setItem(FP_ID_KEY, b64url(cred.rawId));
+    localStorage.setItem(FP_PIN_KEY, pin);
+    return true;
+  } catch (e) {
+    toast('지문 등록 실패 (' + e.name + ')');
+    return false;
+  }
+}
+function buildAllowCredentials() {
+  const credIdB64 = localStorage.getItem(FP_ID_KEY);
+  if (!credIdB64) return null;
+  return [{ id: unb64url(credIdB64), type: 'public-key', transports: ['internal'] }];
+}
+async function authenticateFingerprint() {
+  const allowCredentials = buildAllowCredentials();
+  if (!allowCredentials) throw new Error('no registered credential');
+  const assertion = await navigator.credentials.get({
+    publicKey: { challenge: crypto.getRandomValues(new Uint8Array(32)), allowCredentials, userVerification: 'required', timeout: 60000 }
+  });
+  if (!assertion) throw new Error('no assertion');
+  return localStorage.getItem(FP_PIN_KEY);
+}
+function updateFingerprintSettingLabel() {
+  const el = document.getElementById('settingsFingerprintBtn');
+  if (!el) return;
+  el.innerHTML = fpIsRegistered()
+    ? '<i class="ti ti-fingerprint"></i>지문 등록됨 (탭하여 해제)'
+    : '<i class="ti ti-fingerprint"></i>지문 등록';
+}
+
+/* ---------------- 잠금 화면 (PIN 입력) ---------------- */
+let lockMode = 'unlock'; // 'setup1' | 'setup2' | 'unlock'
+let pinBuffer = '';
+let tempPin = '';
+const lockDotsEl = document.getElementById('lockDots');
+const lockSubEl = document.getElementById('lockSub');
+
+function renderLockDots() {
+  lockDotsEl.querySelectorAll('.dot').forEach((d, i) => d.classList.toggle('filled', i < pinBuffer.length));
+}
+function shakeLockDots() {
+  lockDotsEl.classList.add('shake');
+  setTimeout(() => lockDotsEl.classList.remove('shake'), 400);
+}
+
+document.getElementById('lockKeypad').addEventListener('click', (e) => {
+  const btn = e.target.closest('.key');
+  if (!btn || !btn.dataset.k) return;
+  if (btn.dataset.k === 'back') { pinBuffer = pinBuffer.slice(0, -1); renderLockDots(); return; }
+  if (pinBuffer.length >= 6) return;
+  pinBuffer += btn.dataset.k;
+  renderLockDots();
+  if (pinBuffer.length === 6) setTimeout(handlePinComplete, 120);
+});
+
+document.getElementById('fpBtn').addEventListener('click', async (e) => {
+  e.currentTarget.classList.remove('pulse');
+  void e.currentTarget.offsetWidth;
+  e.currentTarget.classList.add('pulse');
+  if (lockMode !== 'unlock') return;
+  if (!fpIsRegistered()) { toast('등록된 지문이 없습니다. PIN으로 잠금 해제하세요'); return; }
+  try {
+    const pin = await authenticateFingerprint();
+    const ok = pin ? await verifyPin(pin) : false;
+    if (!ok) throw new Error('pin mismatch');
+    pinBuffer = ''; renderLockDots();
+    unlockApp();
+  } catch (err) {
+    toast('지문 인증에 실패했습니다');
+  }
+});
+
+async function handlePinComplete() {
+  const pin = pinBuffer;
+  if (lockMode === 'setup1') {
+    tempPin = pin; pinBuffer = ''; renderLockDots();
+    lockMode = 'setup2';
+    lockSubEl.textContent = '확인을 위해 다시 한 번 입력하세요';
+    return;
+  }
+  if (lockMode === 'setup2') {
+    if (pin !== tempPin) {
+      shakeLockDots();
+      lockSubEl.textContent = 'PIN이 일치하지 않습니다. 처음부터 다시 설정하세요';
+      pinBuffer = ''; tempPin = ''; renderLockDots();
+      lockMode = 'setup1';
+      setTimeout(() => { lockSubEl.textContent = 'PIN 6자리를 설정하세요'; }, 1600);
+      return;
+    }
+    await setPin(pin);
+    pinBuffer = '';
+    unlockApp();
+    return;
+  }
+  // unlock
+  const ok = await verifyPin(pin);
+  pinBuffer = '';
+  if (ok) {
+    renderLockDots();
+    unlockApp();
+  } else {
+    shakeLockDots();
+    lockSubEl.textContent = 'PIN이 올바르지 않습니다';
+    renderLockDots();
+    setTimeout(() => { lockSubEl.textContent = 'PIN 6자리를 입력하세요'; }, 1400);
+  }
+}
+
+function initLock() {
+  lockMode = hasPinSet() ? 'unlock' : 'setup1';
+  lockSubEl.textContent = hasPinSet() ? 'PIN 6자리를 입력하세요' : 'PIN 6자리를 설정하세요';
+}
+
+function unlockApp() {
+  document.getElementById('lockScreen').classList.add('hidden');
+  document.getElementById('app').classList.remove('hidden');
+  updateFingerprintSettingLabel();
+  boot();
+}
+
+/* ---------------- PIN 변경 / 지문 등록 확인 ---------------- */
+let pcMode = null; // 'verify' | 'new1' | 'new2' | 'fp-verify'
+let pcBuffer = '';
+let pcNewPin = '';
+const pcDotsEl = document.getElementById('pcDots');
+const pcSubEl = document.getElementById('pcSub');
+const pcTitleEl = document.getElementById('pcTitle');
+
+function pcRenderDots() {
+  pcDotsEl.querySelectorAll('.pc-dot').forEach((d, i) => d.classList.toggle('filled', i < pcBuffer.length));
+}
+function pcShake() {
+  pcDotsEl.classList.add('shake');
+  setTimeout(() => pcDotsEl.classList.remove('shake'), 400);
+}
+
+function openPinChangeSheet() {
+  closeAllSheets();
+  pcMode = 'verify'; pcBuffer = ''; pcNewPin = '';
+  pcTitleEl.textContent = '현재 PIN 입력';
+  pcSubEl.textContent = '잠금 해제에 사용 중인 PIN을 입력하세요';
+  pcRenderDots();
+  openSheet(document.getElementById('pinChangeSheet'));
+}
+
+function toggleFingerprintSetting() {
+  if (fpIsRegistered()) {
+    fpClear();
+    updateFingerprintSettingLabel();
+    toast('지문 등록이 해제되었습니다');
+    return;
+  }
+  closeAllSheets();
+  pcMode = 'fp-verify'; pcBuffer = ''; pcNewPin = '';
+  pcTitleEl.textContent = '현재 PIN 입력';
+  pcSubEl.textContent = '지문 등록을 위해 PIN을 입력하세요';
+  pcRenderDots();
+  openSheet(document.getElementById('pinChangeSheet'));
+}
+
+document.getElementById('pcKeypad').addEventListener('click', (e) => {
+  const btn = e.target.closest('.pc-key');
+  if (!btn || !btn.dataset.k) return;
+  if (btn.dataset.k === 'back') { pcBuffer = pcBuffer.slice(0, -1); pcRenderDots(); return; }
+  if (pcBuffer.length >= 6) return;
+  pcBuffer += btn.dataset.k;
+  pcRenderDots();
+  if (pcBuffer.length === 6) setTimeout(pcHandleComplete, 120);
+});
+
+async function pcHandleComplete() {
+  const pin = pcBuffer;
+  if (pcMode === 'fp-verify') {
+    const ok = await verifyPin(pin);
+    if (!ok) {
+      pcShake(); pcSubEl.textContent = 'PIN이 올바르지 않습니다'; pcBuffer = ''; pcRenderDots();
+      setTimeout(() => { pcSubEl.textContent = '지문 등록을 위해 PIN을 입력하세요'; }, 1400);
+      return;
+    }
+    pcMode = null; pcBuffer = '';
+    closeAllSheets();
+    const regOk = await registerFingerprint(pin);
+    updateFingerprintSettingLabel();
+    if (regOk) toast('지문이 등록되었습니다');
+    return;
+  }
+  if (pcMode === 'verify') {
+    const ok = await verifyPin(pin);
+    if (!ok) {
+      pcShake(); pcSubEl.textContent = 'PIN이 올바르지 않습니다'; pcBuffer = ''; pcRenderDots();
+      setTimeout(() => { pcSubEl.textContent = '잠금 해제에 사용 중인 PIN을 입력하세요'; }, 1400);
+      return;
+    }
+    pcMode = 'new1'; pcBuffer = ''; pcRenderDots();
+    pcTitleEl.textContent = '새 PIN 설정';
+    pcSubEl.textContent = '새로운 PIN 6자리를 입력하세요';
+    return;
+  }
+  if (pcMode === 'new1') {
+    pcNewPin = pin; pcBuffer = ''; pcRenderDots();
+    pcMode = 'new2';
+    pcSubEl.textContent = '확인을 위해 다시 한 번 입력하세요';
+    return;
+  }
+  // new2
+  if (pin !== pcNewPin) {
+    pcShake(); pcSubEl.textContent = 'PIN이 일치하지 않습니다. 처음부터 다시 설정하세요';
+    pcBuffer = ''; pcNewPin = ''; pcRenderDots();
+    pcMode = 'new1';
+    setTimeout(() => { pcSubEl.textContent = '새로운 PIN 6자리를 입력하세요'; }, 1600);
+    return;
+  }
+  await setPin(pin);
+  const hadFp = fpIsRegistered();
+  fpClear();
+  updateFingerprintSettingLabel();
+  pcMode = null; pcBuffer = ''; pcNewPin = '';
+  closeAllSheets();
+  toast(hadFp ? 'PIN이 변경되었습니다. 지문을 다시 등록해주세요' : 'PIN이 변경되었습니다');
+}
+
+/* ══════════════════════════════
    부트
 ══════════════════════════════ */
-(async function boot() {
+async function boot() {
   renderGroupList();
+  renderGroupChips();
   renderReviewBody();
   await loadCourses();
-})();
+}
+
+initLock();
 
 if ('serviceWorker' in navigator && location.protocol !== 'file:') {
   navigator.serviceWorker.register('/sw.js').catch(() => {});

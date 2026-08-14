@@ -985,9 +985,13 @@ function openCourseDetailSheet(courseId) {
     : '<i class="ti ti-external-link"></i>카카오골프예약';
   kakaoBtn.onclick = () => openKakaoGolf(c.id);
   const dateHint = document.getElementById('courseDetailDateHint');
-  dateHint.textContent = (c.kakaoGolfId && group && group.scheduledDate)
-    ? `예정일(${formatDateShort(group.scheduledDate)}) 기준 예약 현황으로 바로 이동해요.`
-    : (c.kakaoGolfId ? '카카오골프예약에서 이 골프장 페이지로 바로 이동해요.' : '카카오골프예약 검색 결과로 이동해요.');
+  dateHint.textContent = c.kakaoGolfId
+    ? (group && group.scheduledDate
+      ? `예정일(${formatDateShort(group.scheduledDate)}) 기준 예약 현황으로 바로 이동해요.`
+      : '카카오골프예약에서 이 골프장 페이지로 바로 이동해요.')
+    : (group && group.scheduledDate
+      ? `이 골프장은 카카오골프예약 상세페이지 매칭이 안 되어 있어 이름 검색으로만 안내해요. 예정일(${formatDateShort(group.scheduledDate)})은 반영되지 않으니 검색 결과에서 직접 날짜를 선택해주세요.`
+      : '이 골프장은 카카오골프예약 상세페이지 매칭이 안 되어 있어 날짜 지정 없이 이름 검색만 가능해요.');
   openSheet(document.getElementById('courseDetailSheet'));
 }
 

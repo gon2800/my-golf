@@ -241,8 +241,11 @@ body{font-family:-apple-system,"Apple SD Gothic Neo","Noto Sans KR","Malgun Goth
 /* ══════════════════════════════
    상수
 ══════════════════════════════ */
-const BUNDANG = { lat: 37.3825, lng: 127.1191 }; // 분당구청 인근 기준점
-const STRAIGHT_LINE_RADIUS_KM = 55; // 1차 필터: 넉넉하게 잡고 실제 시간은 API로 확정
+const AVG_SPEED_KMH = 65; // 직선거리 → 반경 환산용 평균 속도 (시속 60~70km 중간값)
+const BASE_TIME_H = 2; // 기본 반경: 동행자별 2시간 상당 거리
+const TIME_STEP_H = 0.5; // 교집합 후보가 부족하면 30분씩 단계적으로 확대
+const MIN_CANDIDATES = 3; // 이 개수 이상 나올 때까지 반경 확대
+const MAX_RADIUS_STEPS = 6; // 안전판: 최대 2h + 6×0.5h = 5시간 상당까지만 확대
 const TIME_COEF = { dawn: 1.0, morning: 1.2, lunch: 1.1 };
 const TIME_LABELS = { dawn: '새벽', morning: '오전', lunch: '점심' };
 const GEOCODE_API = '/api/geocode';
@@ -659,16 +662,7 @@ async function runCalculation() {
       await sleep(80);
     }
 
-    // 2) 분당 기준 직선거리 1차 필터
-    const withDist = COURSES.filter(c => c.lat).map(c => ({ ...c, distFromBundang: haversineKm(BUNDANG.lat, BUNDANG.lng, c.lat, c.lng) }));
-    const filtered = withDist.filter(c => c.distFromBundang <= STRAIGHT_LINE_RADIUS_KM);
-
-    if (filtered.length === 0) {
-      toast('반경 내 골프장을 찾지 못했습니다. 잠시 후 다시 시도해주세요');
-      return;
-    }
-
-    // 3) 동행자 주소 지오코딩
+    // 2) 동행자 주소 지오코딩
     for (let i = 0; i < group.members.length; i++) {
       const m = group.members[i];
       const key = normAddrKey(m.addr);
@@ -681,6 +675,27 @@ async function runCalculation() {
     const membersGeo = group.members.map(m => ({ ...m, geo: geoCache[normAddrKey(m.addr)] })).filter(m => m.geo);
     if (membersGeo.length === 0) {
       toast('동행자 동네 위치를 확인하지 못했습니다. 동/구 단위까지 정확히 입력해주세요');
+      return;
+    }
+
+    // 3) 동행자별 반경 원의 교집합으로 1차 필터 (직선거리 → 시간 환산)
+    //    후보가 MIN_CANDIDATES개 미만이면 반경을 단계적으로 넓혀 재시도한다.
+    const candidateCourses = COURSES.filter(c => c.lat);
+    let timeH = BASE_TIME_H;
+    let radiusKm = AVG_SPEED_KMH * timeH;
+    let filtered = [];
+    for (let step = 0; step <= MAX_RADIUS_STEPS; step++) {
+      radiusKm = AVG_SPEED_KMH * timeH;
+      filtered = candidateCourses.filter(c =>
+        membersGeo.every(m => haversineKm(m.geo.lat, m.geo.lng, c.lat, c.lng) <= radiusKm)
+      );
+      progress.textContent = `탐색 반경 확인 중 (${timeH}시간 상당 · 후보 ${filtered.length}곳)`;
+      if (filtered.length >= MIN_CANDIDATES || step === MAX_RADIUS_STEPS) break;
+      timeH += TIME_STEP_H;
+    }
+
+    if (filtered.length === 0) {
+      toast('교집합 반경 내 골프장을 찾지 못했습니다. 동행자 동네를 확인해주세요');
       return;
     }
 
@@ -716,7 +731,7 @@ async function runCalculation() {
       return { course: c, memberTimes };
     }).filter(r => r.memberTimes.every(mt => mt.min !== null));
 
-    lastComputed = { groupId: group.id, rows };
+    lastComputed = { groupId: group.id, rows, usedTimeH: timeH, usedRadiusKm: Math.round(radiusKm) };
     progress.textContent = '';
     progress.classList.add('hidden');
     btn.disabled = false;
@@ -735,6 +750,10 @@ function renderCourseList() {
   const listEl = document.getElementById('courseList');
   if (!lastComputed) { listEl.innerHTML = ''; return; }
 
+  const radiusInfo = `<div class="course-summary" style="margin:0 0 12px;">
+    탐색 반경: 동행자별 직선거리 약 <b>${lastComputed.usedTimeH}시간</b> 상당(약 ${lastComputed.usedRadiusKm}km) 교집합 · 1차 후보 ${lastComputed.rows.length}곳
+  </div>`;
+
   const coef = TIME_COEF[settings.timeSlot];
   let rows = lastComputed.rows.map(r => {
     const times = r.memberTimes.map(mt => ({ name: mt.name, min: Math.round(mt.min * coef) }));
@@ -750,11 +769,11 @@ function renderCourseList() {
   rows.sort((a, b) => settings.sortMode === 'minimax' ? (a.maxMin - b.maxMin) : (a.sumMin - b.sumMin));
 
   if (rows.length === 0) {
-    listEl.innerHTML = `<div class="empty-state"><i class="ti ti-filter-off"></i>조건에 맞는 골프장이 없어요</div>`;
+    listEl.innerHTML = radiusInfo + `<div class="empty-state"><i class="ti ti-filter-off"></i>조건에 맞는 골프장이 없어요</div>`;
     return;
   }
 
-  listEl.innerHTML = rows.map(r => {
+  listEl.innerHTML = radiusInfo + rows.map(r => {
     const c = r.course;
     const isVisited = !!visited[c.id];
     const typeClass = c.type === '대중제' ? 'public' : '';

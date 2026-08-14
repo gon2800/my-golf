@@ -246,10 +246,29 @@ const BASE_TIME_H = 2; // 기본 반경: 동행자별 2시간 상당 거리
 const TIME_STEP_H = 0.5; // 교집합 후보가 부족하면 30분씩 단계적으로 확대
 const MIN_CANDIDATES = 3; // 이 개수 이상 나올 때까지 반경 확대
 const MAX_RADIUS_STEPS = 6; // 안전판: 최대 2h + 6×0.5h = 5시간 상당까지만 확대
+const MAX_CANDIDATES_FOR_API = 30; // 실제 길찾기 API는 가장 가까운 이 개수까지만 호출
+const REGION_MARGIN_KM = 35; // 좌표 미확보 골프장의 지역 중심점 추정 오차 보정용 여유 반경
 const TIME_COEF = { dawn: 1.0, morning: 1.2, lunch: 1.1 };
 const TIME_LABELS = { dawn: '새벽', morning: '오전', lunch: '점심' };
 const GEOCODE_API = '/api/geocode';
 const DIRECTIONS_API = '/api/directions';
+
+// 좌표가 아직 없는 골프장(지식 기반 등록분)의 대략적인 지역 중심 좌표.
+// 반경 필터 단계에서 "지오코딩해볼 가치가 있는지"를 싸게 먼저 걸러내는 용도이며,
+// 실제 후보 확정은 지오코딩 후 정확한 좌표로 다시 검증한다.
+const REGION_CENTROIDS = {
+  '강릉시': [37.751, 128.876], '거제시': [34.881, 128.621], '경산시': [35.825, 128.741],
+  '경주시': [35.856, 129.225], '광주광역시': [35.160, 126.851], '광주시': [37.429, 127.255],
+  '김포시': [37.615, 126.716], '김해시': [35.228, 128.889], '남양주시': [37.636, 127.216],
+  '대구광역시': [35.871, 128.601], '무주군': [36.007, 127.661], '서귀포시': [33.253, 126.560],
+  '안성시': [37.008, 127.280], '양산시': [35.335, 129.038], '양양군': [38.075, 128.619],
+  '여주시': [37.298, 127.637], '용인시': [37.241, 127.177], '울산광역시': [35.538, 129.311],
+  '원주시': [37.342, 127.920], '이천시': [37.272, 127.435], '인천광역시': [37.456, 126.705],
+  '정선군': [37.380, 128.661], '제주시': [33.499, 126.531], '춘천시': [37.881, 127.730],
+  '파주시': [37.760, 126.780], '평창군': [37.370, 128.390], '포천시': [37.895, 127.200],
+  '홍천군': [37.697, 127.888], '화성시': [37.199, 126.831], '화순군': [35.064, 126.986],
+  '횡성군': [37.491, 127.985],
+};
 
 /* ══════════════════════════════
    저장소 헬퍼
@@ -658,19 +677,7 @@ async function runCalculation() {
   progress.classList.remove('hidden');
 
   try {
-    // 1) 골프장 좌표 확보 (미확보분만)
-    const needGeoCourses = COURSES.filter(c => !c.lat);
-    for (let i = 0; i < needGeoCourses.length; i++) {
-      const c = needGeoCourses[i];
-      progress.textContent = `골프장 위치 확인 중 (${i + 1}/${needGeoCourses.length})`;
-      try {
-        const g = await kakaoGeocode(`${c.region} ${c.name}`);
-        if (g) { c.lat = g.lat; c.lng = g.lng; c.address = g.address; geoCache['course:' + c.id] = g; save('mygolf_geo', geoCache); }
-      } catch (e) { if (isFatalErr(e)) throw e; /* 개별 실패는 건너뜀 */ }
-      await sleep(80);
-    }
-
-    // 2) 동행자 주소 지오코딩
+    // 1) 동행자 주소 지오코딩 (반경 계산의 기준점이므로 가장 먼저 필요)
     for (let i = 0; i < group.members.length; i++) {
       const m = group.members[i];
       const key = normAddrKey(m.addr);
@@ -686,28 +693,67 @@ async function runCalculation() {
       return;
     }
 
-    // 3) 동행자별 반경 원의 교집합으로 1차 필터 (직선거리 → 시간 환산)
-    //    후보가 MIN_CANDIDATES개 미만이면 반경을 단계적으로 넓혀 재시도한다.
-    const candidateCourses = COURSES.filter(c => c.lat);
+    // 2) 동행자별 반경 원의 교집합으로 1차 필터 (직선거리 → 시간 환산, API 호출 없음)
+    //    좌표가 이미 있는 골프장은 정확한 거리로, 아직 없는 골프장은 지역 중심좌표 + 여유반경으로
+    //    "지오코딩해볼 가치가 있는지"만 싸게 판단한다. 후보가 MIN_CANDIDATES개 미만이면
+    //    반경을 단계적으로 넓혀 재시도한다.
+    function withinRadius(c, radiusKm) {
+      const centroid = c.lat ? null : REGION_CENTROIDS[c.region];
+      const pos = c.lat ? { lat: c.lat, lng: c.lng } : (centroid ? { lat: centroid[0], lng: centroid[1] } : null);
+      if (!pos) return false;
+      const margin = c.lat ? 0 : REGION_MARGIN_KM;
+      return membersGeo.every(m => haversineKm(m.geo.lat, m.geo.lng, pos.lat, pos.lng) <= radiusKm + margin);
+    }
+
     let timeH = BASE_TIME_H;
     let radiusKm = AVG_SPEED_KMH * timeH;
-    let filtered = [];
+    let roughFiltered = [];
     for (let step = 0; step <= MAX_RADIUS_STEPS; step++) {
       radiusKm = AVG_SPEED_KMH * timeH;
-      filtered = candidateCourses.filter(c =>
-        membersGeo.every(m => haversineKm(m.geo.lat, m.geo.lng, c.lat, c.lng) <= radiusKm)
-      );
-      progress.textContent = `탐색 반경 확인 중 (${timeH}시간 상당 · 후보 ${filtered.length}곳)`;
-      if (filtered.length >= MIN_CANDIDATES || step === MAX_RADIUS_STEPS) break;
+      roughFiltered = COURSES.filter(c => withinRadius(c, radiusKm));
+      progress.textContent = `탐색 반경 확인 중 (${timeH}시간 상당 · 후보 ${roughFiltered.length}곳)`;
+      if (roughFiltered.length >= MIN_CANDIDATES || step === MAX_RADIUS_STEPS) break;
       timeH += TIME_STEP_H;
     }
+
+    if (roughFiltered.length === 0) {
+      toast('교집합 반경 내 골프장을 찾지 못했습니다. 동행자 동네를 확인해주세요');
+      return;
+    }
+
+    // 3) 위 1차 후보 중 좌표가 아직 없는 것만 지오코딩 (전체 골프장이 아니라 후보로 좁혀진 것만)
+    const needGeoCourses = roughFiltered.filter(c => !c.lat);
+    for (let i = 0; i < needGeoCourses.length; i++) {
+      const c = needGeoCourses[i];
+      progress.textContent = `골프장 위치 확인 중 (${i + 1}/${needGeoCourses.length})`;
+      try {
+        const g = await kakaoGeocode(`${c.region} ${c.name}`);
+        if (g) { c.lat = g.lat; c.lng = g.lng; c.address = g.address; geoCache['course:' + c.id] = g; save('mygolf_geo', geoCache); }
+      } catch (e) { if (isFatalErr(e)) throw e; /* 개별 실패는 건너뜀 */ }
+      await sleep(80);
+    }
+
+    // 4) 방금 지오코딩된 좌표로 정확하게 재검증 (지역 중심좌표의 여유반경으로 인한 오탐 제거)
+    let filtered = roughFiltered.filter(c =>
+      c.lat && membersGeo.every(m => haversineKm(m.geo.lat, m.geo.lng, c.lat, c.lng) <= radiusKm)
+    );
 
     if (filtered.length === 0) {
       toast('교집합 반경 내 골프장을 찾지 못했습니다. 동행자 동네를 확인해주세요');
       return;
     }
 
-    // 4) 이동시간 계산 (member x course), 캐시 없는 것만 API 호출
+    // 5) 실제 길찾기 API는 비용이 크므로, 가장 가까운 상위 MAX_CANDIDATES_FOR_API개로만 제한한다.
+    const wasCapped = filtered.length > MAX_CANDIDATES_FOR_API;
+    if (wasCapped) {
+      filtered = filtered
+        .map(c => ({ c, score: membersGeo.reduce((s, m) => s + haversineKm(m.geo.lat, m.geo.lng, c.lat, c.lng), 0) }))
+        .sort((a, b) => a.score - b.score)
+        .slice(0, MAX_CANDIDATES_FOR_API)
+        .map(x => x.c);
+    }
+
+    // 6) 이동시간 계산 (member x course), 캐시 없는 것만 API 호출
     const total = membersGeo.length * filtered.length;
     let done = 0;
     for (const m of membersGeo) {
@@ -730,7 +776,7 @@ async function runCalculation() {
       }
     }
 
-    // 5) 결과 취합
+    // 7) 결과 취합
     const rows = filtered.map(c => {
       const memberTimes = membersGeo.map(m => {
         const t = travelCache[normAddrKey(m.addr) + '__' + c.id];
@@ -739,7 +785,7 @@ async function runCalculation() {
       return { course: c, memberTimes };
     }).filter(r => r.memberTimes.every(mt => mt.min !== null));
 
-    lastComputed = { groupId: group.id, rows, usedTimeH: timeH, usedRadiusKm: Math.round(radiusKm) };
+    lastComputed = { groupId: group.id, rows, usedTimeH: timeH, usedRadiusKm: Math.round(radiusKm), wasCapped };
     progress.textContent = '';
     progress.classList.add('hidden');
     btn.disabled = false;
@@ -761,6 +807,7 @@ function renderCourseList() {
 
   const radiusInfo = `<div class="course-summary" style="margin:0 0 12px;">
     탐색 반경: 동행자별 직선거리 약 <b>${lastComputed.usedTimeH}시간</b> 상당(약 ${lastComputed.usedRadiusKm}km) 교집합 · 1차 후보 ${lastComputed.rows.length}곳
+    ${lastComputed.wasCapped ? `<br>후보가 많아 가장 가까운 상위 ${MAX_CANDIDATES_FOR_API}곳만 계산했어요` : ''}
   </div>`;
 
   const coef = TIME_COEF[settings.timeSlot];

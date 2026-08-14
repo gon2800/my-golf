@@ -17,7 +17,12 @@ export async function onRequestGet(context) {
   try {
     const apiUrl = `https://apis-navi.kakaomobility.com/v1/directions?origin=${oLng},${oLat}&destination=${dLng},${dLat}&priority=RECOMMEND`;
     const res = await fetch(apiUrl, { headers });
-    if (!res.ok) return json({ error: 'upstream_failed' }, 502);
+    if (!res.ok) {
+      if (res.status === 401 || res.status === 403) {
+        return json({ error: 'kakao_unauthorized', upstreamStatus: res.status }, 502);
+      }
+      return json({ error: 'kakao_upstream_error', upstreamStatus: res.status }, 502);
+    }
 
     const data = await res.json();
     const route = data.routes && data.routes[0];

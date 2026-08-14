@@ -540,12 +540,19 @@ function clearAllCache() {
 /* ══════════════════════════════
    카카오 API (Cloudflare Pages Functions 프록시 경유 — 키는 서버에만 존재)
 ══════════════════════════════ */
+function isFatalErr(e) { return e.message === 'SERVER_NOT_CONFIGURED' || e.message === 'KAKAO_UNAUTHORIZED'; }
+function fatalApiError(data) {
+  if (data.error === 'server_not_configured') return new Error('SERVER_NOT_CONFIGURED');
+  if (data.error === 'kakao_unauthorized') return new Error('KAKAO_UNAUTHORIZED');
+  return null;
+}
 async function kakaoGeocode(query) {
   const key = normAddrKey(query);
   if (geoCache[key]) return geoCache[key];
   const res = await fetch(`${GEOCODE_API}?q=${encodeURIComponent(query)}`);
   const data = await res.json();
-  if (data.error === 'server_not_configured') throw new Error('SERVER_NOT_CONFIGURED');
+  const fatal = fatalApiError(data);
+  if (fatal) throw fatal;
   if (!res.ok || data.error) return null;
   const result = { lat: data.lat, lng: data.lng, address: data.address, ts: Date.now() };
   geoCache[key] = result;
@@ -556,7 +563,8 @@ async function kakaoDirections(originLat, originLng, destLat, destLng) {
   const url = `${DIRECTIONS_API}?origin=${originLat},${originLng}&destination=${destLat},${destLng}`;
   const res = await fetch(url);
   const data = await res.json();
-  if (data.error === 'server_not_configured') throw new Error('SERVER_NOT_CONFIGURED');
+  const fatal = fatalApiError(data);
+  if (fatal) throw fatal;
   if (!res.ok || data.error) return null;
   return { min: data.min, km: data.km };
 }
@@ -658,7 +666,7 @@ async function runCalculation() {
       try {
         const g = await kakaoGeocode(`${c.region} ${c.name}`);
         if (g) { c.lat = g.lat; c.lng = g.lng; c.address = g.address; geoCache['course:' + c.id] = g; save('mygolf_geo', geoCache); }
-      } catch (e) { if (e.message === 'SERVER_NOT_CONFIGURED') throw e; /* 개별 실패는 건너뜀 */ }
+      } catch (e) { if (isFatalErr(e)) throw e; /* 개별 실패는 건너뜀 */ }
       await sleep(80);
     }
 
@@ -668,7 +676,7 @@ async function runCalculation() {
       const key = normAddrKey(m.addr);
       if (!geoCache[key]) {
         progress.textContent = `동행자 위치 확인 중 (${i + 1}/${group.members.length})`;
-        try { await kakaoGeocode(m.addr); } catch (e) { if (e.message === 'SERVER_NOT_CONFIGURED') throw e; /* skip */ }
+        try { await kakaoGeocode(m.addr); } catch (e) { if (isFatalErr(e)) throw e; /* skip */ }
         await sleep(80);
       }
     }
@@ -714,7 +722,7 @@ async function runCalculation() {
             travelCache[tKey] = r ? { min: r.min, km: r.km, ts: Date.now() } : { failed: true, ts: Date.now() };
             save('mygolf_travel', travelCache);
           } catch (e) {
-            if (e.message === 'SERVER_NOT_CONFIGURED') throw e;
+            if (isFatalErr(e)) throw e;
             travelCache[tKey] = { failed: true, ts: Date.now() };
           }
           await sleep(80);
@@ -739,6 +747,7 @@ async function runCalculation() {
     toast('계산이 완료되었습니다');
   } catch (e) {
     if (e.message === 'SERVER_NOT_CONFIGURED') toast('서버에 Kakao API 키가 설정되지 않았습니다. 관리자에게 문의하세요');
+    else if (e.message === 'KAKAO_UNAUTHORIZED') toast('Kakao API 키가 유효하지 않습니다 (인증 실패). 관리자에게 문의하세요');
     else toast('계산 중 오류가 발생했습니다: ' + e.message);
   } finally {
     btn.disabled = false;

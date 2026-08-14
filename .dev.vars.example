@@ -4,3 +4,6 @@
 # 실제 배포(Cloudflare Pages) 환경변수는 이 파일과 무관하게
 # Cloudflare 대시보드 > Pages 프로젝트 > Settings > Environment variables 에서 등록합니다.
 KAKAO_REST_KEY=여기에_카카오_REST_API_키
+# 카카오맵 JavaScript SDK용 키 (REST 키와 별개, Kakao Developers 콘솔 > 앱 키 > JavaScript 키).
+# 브라우저에 노출되는 게 정상이며, 콘솔의 플랫폼 > Web에 배포 도메인을 등록해야 동작합니다.
+KAKAO_JS_KEY=여기에_카카오_JavaScript_키

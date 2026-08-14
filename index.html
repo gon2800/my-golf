@@ -119,27 +119,22 @@ body{font-family:-apple-system,"Apple SD Gothic Neo","Noto Sans KR","Malgun Goth
 .calc-btn-row{margin-top:16px;}
 .calc-progress{font-size:12px;color:var(--accent);text-align:center;margin-top:8px;}
 
-.course-list{margin-top:14px;}
-.course-card{background:var(--bg);border-radius:14px;padding:14px;margin-bottom:10px;}
-.course-card:last-child{margin-bottom:0;}
-.course-card-top{display:flex;align-items:flex-start;gap:8px;}
-.course-name{font-size:15px;font-weight:800;color:var(--ink);flex:1;min-width:0;}
-.course-addr{font-size:11px;color:var(--sub);margin-top:3px;}
+.course-addr{font-size:12px;color:var(--sub);margin-top:3px;}
 .badge{display:inline-block;padding:3px 9px;border-radius:7px;font-size:11px;font-weight:700;background:var(--accent-soft);color:var(--accent);flex-shrink:0;}
 .badge.public{background:#E9F7EF;color:#2E9E5B;}
 .badge.visited{background:#FFF3D9;color:#B4790C;}
-.badge.warn{background:var(--danger-soft);color:var(--danger);}
-.course-badges{display:flex;gap:5px;flex-wrap:wrap;flex-shrink:0;}
-
-.member-time-list{margin-top:10px;background:var(--card);border-radius:10px;padding:8px 10px;}
-.member-time-row{display:flex;justify-content:space-between;align-items:center;padding:4px 0;font-size:13px;}
-.member-time-row .mn{color:var(--ink);font-weight:600;}
-.member-time-row .mt{color:var(--sub);font-weight:700;}
-.member-time-row.worst .mt{color:var(--danger);}
-.course-summary{font-size:12px;color:var(--sub);margin-top:8px;line-height:1.6;}
+.course-summary{font-size:12px;color:var(--sub);line-height:1.6;}
 .course-summary b{color:var(--accent);}
 .course-btn-row{display:flex;gap:8px;margin-top:12px;}
 .course-btn-row .btn-secondary{flex:1;justify-content:center;}
+
+/* ── 지도 ── */
+.map-card{padding:14px;}
+#mapContainer{width:100%;height:380px;border-radius:12px;overflow:hidden;background:var(--bg);}
+.map-legend{display:flex;gap:16px;align-items:center;margin-top:10px;font-size:11px;color:var(--sub);}
+.map-legend-dot{width:14px;height:14px;border-radius:50%;display:inline-block;margin-right:5px;vertical-align:-2px;}
+.map-member-dot{width:32px;height:32px;border-radius:50%;background:#2E9E5B;color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;box-shadow:0 2px 6px rgba(0,0,0,.3);border:2px solid #fff;}
+.map-course-dot{width:30px;height:30px;border-radius:50%;background:var(--accent);color:#fff;display:flex;align-items:center;justify-content:center;font-size:15px;box-shadow:0 2px 6px rgba(0,0,0,.3);border:2px solid #fff;cursor:pointer;}
 
 /* ══ 설정 시트 ══ */
 .settings-help{font-size:11px;color:var(--sub);line-height:1.6;margin:-4px 0 14px;}
@@ -220,16 +215,27 @@ body{font-family:-apple-system,"Apple SD Gothic Neo","Noto Sans KR","Malgun Goth
   <div class="handle"></div>
   <div class="sheet-title">설정</div>
   <div class="settings-help" style="margin-top:0;">
-    골프장 위치·이동시간 계산은 서버(Cloudflare Pages Functions)에서 처리됩니다.
+    골프장·동행자 위치 확인은 서버(Cloudflare Pages Functions)에서 처리됩니다.
     Kakao API 키는 브라우저에 노출되지 않습니다.
   </div>
 
   <div class="ctrl-label" style="margin-top:0;">캐시 현황</div>
-  <div class="cache-stat"><span>골프장 좌표 캐시</span><span id="statGeo">0개</span></div>
-  <div class="cache-stat"><span>이동시간 캐시</span><span id="statTravel">0건</span></div>
+  <div class="cache-stat"><span>위치 좌표 캐시</span><span id="statGeo">0개</span></div>
   <button class="btn-secondary" style="margin-top:12px;width:100%;justify-content:center;" onclick="clearAllCache()">
     <i class="ti ti-trash"></i>캐시 전체 초기화
   </button>
+</div>
+
+<!-- 골프장 상세 (지도 마커 클릭 시) -->
+<div class="sheet" id="courseDetailSheet">
+  <div class="handle"></div>
+  <div class="sheet-title" id="courseDetailTitle">골프장 이름</div>
+  <div class="course-addr" id="courseDetailAddr" style="margin-bottom:10px;"></div>
+  <span class="badge" id="courseDetailBadge"></span>
+  <div class="course-btn-row" style="margin-top:16px;">
+    <button class="btn-secondary" id="courseDetailVisitBtn"><i class="ti ti-check"></i>방문 체크</button>
+    <button class="btn-secondary" id="courseDetailKakaoBtn"><i class="ti ti-external-link"></i>카카오골프예약</button>
+  </div>
 </div>
 
 <div id="overlay" onclick="closeAllSheets()"></div>
@@ -246,12 +252,10 @@ const BASE_TIME_H = 2; // 기본 반경: 동행자별 2시간 상당 거리
 const TIME_STEP_H = 0.5; // 교집합 후보가 부족하면 30분씩 단계적으로 확대
 const MIN_CANDIDATES = 3; // 이 개수 이상 나올 때까지 반경 확대
 const MAX_RADIUS_STEPS = 6; // 안전판: 최대 2h + 6×0.5h = 5시간 상당까지만 확대
-const MAX_CANDIDATES_FOR_API = 30; // 실제 길찾기 API는 가장 가까운 이 개수까지만 호출
 const REGION_MARGIN_KM = 35; // 좌표 미확보 골프장의 지역 중심점 추정 오차 보정용 여유 반경
-const TIME_COEF = { dawn: 1.0, morning: 1.2, lunch: 1.1 };
-const TIME_LABELS = { dawn: '새벽', morning: '오전', lunch: '점심' };
 const GEOCODE_API = '/api/geocode';
-const DIRECTIONS_API = '/api/directions';
+const CONFIG_API = '/api/config';
+const TWO_CHAR_SURNAMES = ['남궁', '황보', '제갈', '선우', '독고', '사공', '서문', '동방'];
 
 // 좌표가 아직 없는 골프장(지식 기반 등록분)의 대략적인 지역 중심 좌표.
 // 반경 필터 단계에서 "지오코딩해볼 가치가 있는지"를 싸게 먼저 걸러내는 용도이며,
@@ -282,12 +286,14 @@ function save(key, val) { localStorage.setItem(key, JSON.stringify(val)); }
 let groups = load('mygolf_groups', []);
 let selectedGroupId = load('mygolf_selectedGroup', null);
 let visited = load('mygolf_visited', {});
-let settings = load('mygolf_settings', { timeSlot: 'morning', sortMode: 'minimax', typeFilter: 'all' });
+let settings = load('mygolf_settings', { typeFilter: 'all' });
 let geoCache = load('mygolf_geo', {});
-let travelCache = load('mygolf_travel', {});
 
 let COURSES = [];
-let lastComputed = null; // { groupId, rows: [...] }
+let lastComputed = null; // { groupId, courses:[...], membersGeo:[...], usedTimeH, usedRadiusKm }
+let mapInstance = null;
+let mapOverlays = [];
+let kakaoMapsLoadPromise = null;
 
 /* ══════════════════════════════
    탭 전환
@@ -312,15 +318,17 @@ function switchTab(t) {
     card.classList.toggle('corner-last', idx === TABS.length - 1);
   }
 
-  if (t === 'candidates') renderCandidatesTab();
-  if (t === 'history') renderHistory();
-
   tabSwitching = true;
   newScreen.style.transition = 'none';
   newScreen.style.transform = `translateX(${forward ? 100 : -100}%)`;
   newScreen.classList.add('active');
   oldScreen.style.transition = 'none';
   oldScreen.style.transform = 'translateX(0)';
+
+  // 지도(카카오맵)는 컨테이너가 display:none인 상태에서 생성하면 크기를 0으로 읽어
+  // 깨지므로, 화면이 .active(display:block)가 된 뒤에 렌더링한다.
+  if (t === 'candidates') renderCandidatesTab();
+  if (t === 'history') renderHistory();
 
   void newScreen.offsetWidth;
 
@@ -545,11 +553,10 @@ function openSettingsSheet() {
 }
 function updateCacheStats() {
   document.getElementById('statGeo').textContent = Object.keys(geoCache).length + '개';
-  document.getElementById('statTravel').textContent = Object.keys(travelCache).length + '건';
 }
 async function clearAllCache() {
-  geoCache = {}; travelCache = {};
-  save('mygolf_geo', geoCache); save('mygolf_travel', travelCache);
+  geoCache = {};
+  save('mygolf_geo', geoCache);
   await loadCourses(); // 골프장 목록에 내장된 좌표는 유지한 채, 런타임에 지오코딩했던 캐시만 걷어낸다
   lastComputed = null;
   updateCacheStats();
@@ -578,15 +585,6 @@ async function kakaoGeocode(query) {
   save('mygolf_geo', geoCache);
   return result;
 }
-async function kakaoDirections(originLat, originLng, destLat, destLng) {
-  const url = `${DIRECTIONS_API}?origin=${originLat},${originLng}&destination=${destLat},${destLng}`;
-  const res = await fetch(url);
-  const data = await res.json();
-  const fatal = fatalApiError(data);
-  if (fatal) throw fatal;
-  if (!res.ok || data.error) return null;
-  return { min: data.min, km: data.km };
-}
 
 /* ══════════════════════════════
    골프장 데이터 로드
@@ -598,6 +596,46 @@ async function loadCourses() {
     const cached = geoCache['course:' + c.id];
     return cached ? { ...c, lat: cached.lat, lng: cached.lng, address: cached.address } : { ...c };
   });
+}
+
+/* ══════════════════════════════
+   카카오맵 SDK 로드 (JS 키는 /api/config를 통해 받아옴 — 도메인 제한된 공개용 키)
+══════════════════════════════ */
+function loadKakaoMaps() {
+  if (kakaoMapsLoadPromise) return kakaoMapsLoadPromise;
+  kakaoMapsLoadPromise = fetch(CONFIG_API).then(r => r.json()).then(cfg => {
+    if (!cfg.kakaoJsKey) throw new Error('NO_JS_KEY');
+    if (window.kakao && window.kakao.maps) return;
+    return new Promise((resolve, reject) => {
+      const script = document.createElement('script');
+      script.src = `https://dapi.kakao.com/v2/maps/sdk.js?appkey=${encodeURIComponent(cfg.kakaoJsKey)}&autoload=false`;
+      script.onload = () => window.kakao.maps.load(resolve);
+      script.onerror = () => reject(new Error('MAP_SDK_LOAD_FAILED'));
+      document.head.appendChild(script);
+    });
+  });
+  kakaoMapsLoadPromise.catch(() => { kakaoMapsLoadPromise = null; }); // 실패 시 다음 시도에서 재시도할 수 있게
+  return kakaoMapsLoadPromise;
+}
+
+/* ══════════════════════════════
+   동행자 성씨 라벨 (지도 마커 표시용)
+══════════════════════════════ */
+function splitSurname(fullName) {
+  const n = (fullName || '').trim();
+  for (const s of TWO_CHAR_SURNAMES) {
+    if (n.startsWith(s) && n.length > s.length) return { surname: s, given: n.slice(s.length) };
+  }
+  return { surname: n.slice(0, 1), given: n.slice(1) };
+}
+function buildMemberLabels(members) {
+  const parsed = members.map(m => ({ ...m, ...splitSurname(m.name) }));
+  const counts = {};
+  parsed.forEach(p => { counts[p.surname] = (counts[p.surname] || 0) + 1; });
+  return parsed.map(p => ({
+    ...p,
+    label: counts[p.surname] > 1 ? (p.surname + (p.given.slice(0, 1) || '')) : p.surname
+  }));
 }
 
 /* ══════════════════════════════
@@ -628,46 +666,46 @@ function renderCandidatesTab() {
 
   body.innerHTML = `
     <div class="tab-card">
-      <div class="ctrl-label" style="margin-top:0;">시간대</div>
-      <div class="segment" id="timeSlotSeg">
-        ${Object.keys(TIME_LABELS).map(k => `<div class="segment-item ${settings.timeSlot === k ? 'active' : ''}" onclick="setTimeSlot('${k}')">${TIME_LABELS[k]}</div>`).join('')}
-      </div>
-
-      <div class="ctrl-label">정렬</div>
-      <div class="segment">
-        <div class="segment-item ${settings.sortMode === 'minimax' ? 'active' : ''}" onclick="setSortMode('minimax')">최댓값 최소화</div>
-        <div class="segment-item ${settings.sortMode === 'sum' ? 'active' : ''}" onclick="setSortMode('sum')">합계 최소화</div>
-      </div>
-
-      <div class="ctrl-label">시설 구분</div>
-      <div class="segment">
-        <div class="segment-item ${settings.typeFilter === 'all' ? 'active' : ''}" onclick="setTypeFilter('all')">전체</div>
-        <div class="segment-item ${settings.typeFilter === '회원제' ? 'active' : ''}" onclick="setTypeFilter('회원제')">회원제</div>
-        <div class="segment-item ${settings.typeFilter === '대중제' ? 'active' : ''}" onclick="setTypeFilter('대중제')">대중제</div>
+      <div class="ctrl-label" style="margin-top:0;">시설 구분</div>
+      <div class="segment" id="facilitySeg">
+        <div class="segment-item ${settings.typeFilter === 'all' ? 'active' : ''}" data-v="all" onclick="setTypeFilter('all')">전체</div>
+        <div class="segment-item ${settings.typeFilter === '회원제' ? 'active' : ''}" data-v="회원제" onclick="setTypeFilter('회원제')">회원제</div>
+        <div class="segment-item ${settings.typeFilter === '대중제' ? 'active' : ''}" data-v="대중제" onclick="setTypeFilter('대중제')">대중제</div>
       </div>
 
       <div class="calc-btn-row">
-        <button class="btn-primary" id="calcBtn" onclick="runCalculation(false)">
-          <i class="ti ti-refresh" style="vertical-align:-2px;"></i> ${hasData ? '이동시간 다시 계산' : '이동시간 계산하기'}
+        <button class="btn-primary" id="calcBtn" onclick="findCandidates()">
+          <i class="ti ti-search" style="vertical-align:-2px;"></i> ${hasData ? '후보 다시 찾기' : '골프장 후보 찾기'}
         </button>
         <div class="calc-progress hidden" id="calcProgress"></div>
       </div>
     </div>
 
-    <div class="tab-card" id="courseListCard">
-      ${hasData ? '' : `<div class="empty-state"><i class="ti ti-route"></i>"이동시간 계산하기"를 눌러<br>후보 골프장을 찾아보세요</div>`}
-      <div class="course-list" id="courseList"></div>
+    <div class="tab-card map-card" id="mapCard">
+      ${hasData
+        ? `<div id="mapInfo" class="course-summary" style="margin-bottom:10px;"></div>
+           <div id="mapContainer"></div>
+           <div class="map-legend">
+             <span><span class="map-legend-dot" style="background:#2E9E5B;"></span>동행자</span>
+             <span><span class="map-legend-dot" style="background:var(--accent);"></span>골프장 후보</span>
+           </div>`
+        : `<div class="empty-state"><i class="ti ti-map-pin"></i>"골프장 후보 찾기"를 눌러<br>지도에서 후보를 확인해보세요</div>`
+      }
     </div>
   `;
 
-  if (hasData) renderCourseList();
+  if (hasData) renderMap({ freshContainer: true });
 }
 
-function setTimeSlot(k) { settings.timeSlot = k; save('mygolf_settings', settings); renderCandidatesTab(); }
-function setSortMode(k) { settings.sortMode = k; save('mygolf_settings', settings); renderCandidatesTab(); }
-function setTypeFilter(k) { settings.typeFilter = k; save('mygolf_settings', settings); renderCandidatesTab(); }
+function setTypeFilter(k) {
+  settings.typeFilter = k;
+  save('mygolf_settings', settings);
+  const seg = document.getElementById('facilitySeg');
+  if (seg) seg.querySelectorAll('.segment-item').forEach(el => el.classList.toggle('active', el.dataset.v === k));
+  if (lastComputed) renderMap({ freshContainer: false });
+}
 
-async function runCalculation() {
+async function findCandidates() {
   const group = groups.find(g => g.id === selectedGroupId);
   if (!group) { toast('모임을 먼저 선택하세요'); return; }
 
@@ -693,7 +731,7 @@ async function runCalculation() {
       return;
     }
 
-    // 2) 동행자별 반경 원의 교집합으로 1차 필터 (직선거리 → 시간 환산, API 호출 없음)
+    // 2) 동행자별 반경 원의 교집합으로 필터 (직선거리 → 시간 환산, 하버사인 공식, API 호출 없음)
     //    좌표가 이미 있는 골프장은 정확한 거리로, 아직 없는 골프장은 지역 중심좌표 + 여유반경으로
     //    "지오코딩해볼 가치가 있는지"만 싸게 판단한다. 후보가 MIN_CANDIDATES개 미만이면
     //    반경을 단계적으로 넓혀 재시도한다.
@@ -721,7 +759,7 @@ async function runCalculation() {
       return;
     }
 
-    // 3) 위 1차 후보 중 좌표가 아직 없는 것만 지오코딩 (전체 골프장이 아니라 후보로 좁혀진 것만)
+    // 3) 위 후보 중 좌표가 아직 없는 것만 지오코딩 (전체 골프장이 아니라 후보로 좁혀진 것만)
     const needGeoCourses = roughFiltered.filter(c => !c.lat);
     for (let i = 0; i < needGeoCourses.length; i++) {
       const c = needGeoCourses[i];
@@ -734,7 +772,7 @@ async function runCalculation() {
     }
 
     // 4) 방금 지오코딩된 좌표로 정확하게 재검증 (지역 중심좌표의 여유반경으로 인한 오탐 제거)
-    let filtered = roughFiltered.filter(c =>
+    const filtered = roughFiltered.filter(c =>
       c.lat && membersGeo.every(m => haversineKm(m.geo.lat, m.geo.lng, c.lat, c.lng) <= radiusKm)
     );
 
@@ -743,128 +781,106 @@ async function runCalculation() {
       return;
     }
 
-    // 5) 실제 길찾기 API는 비용이 크므로, 가장 가까운 상위 MAX_CANDIDATES_FOR_API개로만 제한한다.
-    const wasCapped = filtered.length > MAX_CANDIDATES_FOR_API;
-    if (wasCapped) {
-      filtered = filtered
-        .map(c => ({ c, score: membersGeo.reduce((s, m) => s + haversineKm(m.geo.lat, m.geo.lng, c.lat, c.lng), 0) }))
-        .sort((a, b) => a.score - b.score)
-        .slice(0, MAX_CANDIDATES_FOR_API)
-        .map(x => x.c);
-    }
-
-    // 6) 이동시간 계산 (member x course), 캐시 없는 것만 API 호출
-    const total = membersGeo.length * filtered.length;
-    let done = 0;
-    for (const m of membersGeo) {
-      const originKey = normAddrKey(m.addr);
-      for (const c of filtered) {
-        const tKey = originKey + '__' + c.id;
-        done++;
-        if (!travelCache[tKey]) {
-          progress.textContent = `이동시간 계산 중 (${done}/${total})`;
-          try {
-            const r = await kakaoDirections(m.geo.lat, m.geo.lng, c.lat, c.lng);
-            travelCache[tKey] = r ? { min: r.min, km: r.km, ts: Date.now() } : { failed: true, ts: Date.now() };
-            save('mygolf_travel', travelCache);
-          } catch (e) {
-            if (isFatalErr(e)) throw e;
-            travelCache[tKey] = { failed: true, ts: Date.now() };
-          }
-          await sleep(80);
-        }
-      }
-    }
-
-    // 7) 결과 취합
-    const rows = filtered.map(c => {
-      const memberTimes = membersGeo.map(m => {
-        const t = travelCache[normAddrKey(m.addr) + '__' + c.id];
-        return { name: m.name, min: t && !t.failed ? t.min : null };
-      });
-      return { course: c, memberTimes };
-    }).filter(r => r.memberTimes.every(mt => mt.min !== null));
-
-    lastComputed = { groupId: group.id, rows, usedTimeH: timeH, usedRadiusKm: Math.round(radiusKm), wasCapped };
-    progress.textContent = '';
-    progress.classList.add('hidden');
-    btn.disabled = false;
+    lastComputed = { groupId: group.id, courses: filtered, membersGeo, usedTimeH: timeH, usedRadiusKm: Math.round(radiusKm) };
     renderCandidatesTab();
-    toast('계산이 완료되었습니다');
+    toast(`후보 ${filtered.length}곳을 찾았습니다`);
   } catch (e) {
     if (e.message === 'SERVER_NOT_CONFIGURED') toast('서버에 Kakao API 키가 설정되지 않았습니다. 관리자에게 문의하세요');
     else if (e.message === 'KAKAO_UNAUTHORIZED') toast('Kakao API 키가 유효하지 않습니다 (인증 실패). 관리자에게 문의하세요');
-    else toast('계산 중 오류가 발생했습니다: ' + e.message);
+    else toast('찾는 중 오류가 발생했습니다: ' + e.message);
   } finally {
     btn.disabled = false;
     progress.classList.add('hidden');
   }
 }
 
-function renderCourseList() {
-  const listEl = document.getElementById('courseList');
-  if (!lastComputed) { listEl.innerHTML = ''; return; }
+async function renderMap(opts) {
+  const freshContainer = !!(opts && opts.freshContainer);
+  if (!lastComputed) return;
 
-  const radiusInfo = `<div class="course-summary" style="margin:0 0 12px;">
-    탐색 반경: 동행자별 직선거리 약 <b>${lastComputed.usedTimeH}시간</b> 상당(약 ${lastComputed.usedRadiusKm}km) 교집합 · 1차 후보 ${lastComputed.rows.length}곳
-    ${lastComputed.wasCapped ? `<br>후보가 많아 가장 가까운 상위 ${MAX_CANDIDATES_FOR_API}곳만 계산했어요` : ''}
-  </div>`;
+  const container = document.getElementById('mapContainer');
+  if (!container) return;
 
-  const coef = TIME_COEF[settings.timeSlot];
-  let rows = lastComputed.rows.map(r => {
-    const times = r.memberTimes.map(mt => ({ name: mt.name, min: Math.round(mt.min * coef) }));
-    const maxMin = Math.max(...times.map(t => t.min));
-    const sumMin = times.reduce((a, t) => a + t.min, 0);
-    const worst = times.filter(t => t.min === maxMin).map(t => t.name);
-    const minMin = Math.min(...times.map(t => t.min));
-    return { course: r.course, times, maxMin, sumMin, worst, gap: maxMin - minMin };
-  });
-
-  if (settings.typeFilter !== 'all') rows = rows.filter(r => r.course.type === settings.typeFilter);
-
-  rows.sort((a, b) => settings.sortMode === 'minimax' ? (a.maxMin - b.maxMin) : (a.sumMin - b.sumMin));
-
-  if (rows.length === 0) {
-    listEl.innerHTML = radiusInfo + `<div class="empty-state"><i class="ti ti-filter-off"></i>조건에 맞는 골프장이 없어요</div>`;
+  try {
+    await loadKakaoMaps();
+  } catch (e) {
+    container.innerHTML = `<div class="empty-state"><i class="ti ti-map-pin-off"></i>지도를 불러오지 못했습니다<br>관리자에게 문의하세요</div>`;
     return;
   }
 
-  listEl.innerHTML = radiusInfo + rows.map(r => {
-    const c = r.course;
-    const isVisited = !!visited[c.id];
-    const typeClass = c.type === '대중제' ? 'public' : '';
-    return `
-    <div class="course-card">
-      <div class="course-card-top">
-        <div>
-          <div class="course-name">${escapeHtml(c.name)}</div>
-          <div class="course-addr">${escapeHtml(c.address || c.region)}</div>
-        </div>
-        <div class="course-badges">
-          <span class="badge ${typeClass}">${c.type}</span>
-          ${isVisited ? '<span class="badge visited">방문</span>' : ''}
-          ${r.maxMin > 60 ? '<span class="badge warn">60분 초과</span>' : ''}
-        </div>
-      </div>
-      <div class="member-time-list">
-        ${r.times.map(t => `<div class="member-time-row ${r.worst.includes(t.name) ? 'worst' : ''}"><span class="mn">${escapeHtml(t.name)}</span><span class="mt">${t.min}분</span></div>`).join('')}
-      </div>
-      <div class="course-summary">
-        <b>${escapeHtml(r.worst.join(', '))}</b>님이 가장 오래 이동해요 · 합계 <b>${r.sumMin}분</b> · 최대 <b>${r.maxMin}분</b> · 격차 ${r.gap}분
-      </div>
-      <div class="course-btn-row">
-        <button class="btn-secondary ${isVisited ? 'on' : ''}" onclick="toggleVisited('${c.id}')"><i class="ti ti-check"></i>${isVisited ? '방문함' : '방문 체크'}</button>
-        <button class="btn-secondary" onclick="openKakaoGolf('${c.id}')"><i class="ti ti-external-link"></i>카카오골프예약</button>
-      </div>
-    </div>`;
-  }).join('');
+  if (freshContainer || !mapInstance) {
+    const first = lastComputed.membersGeo[0].geo;
+    mapInstance = new kakao.maps.Map(container, {
+      center: new kakao.maps.LatLng(first.lat, first.lng),
+      level: 9
+    });
+  }
+
+  mapOverlays.forEach(o => o.setMap(null));
+  mapOverlays = [];
+
+  const bounds = new kakao.maps.LatLngBounds();
+
+  const labeled = buildMemberLabels(lastComputed.membersGeo.map(m => ({ id: m.id, name: m.name })));
+  lastComputed.membersGeo.forEach(m => {
+    const found = labeled.find(l => l.id === m.id);
+    const label = found ? found.label : (m.name || '').slice(0, 1);
+    const el = document.createElement('div');
+    el.className = 'map-member-dot';
+    el.textContent = label;
+    const pos = new kakao.maps.LatLng(m.geo.lat, m.geo.lng);
+    const overlay = new kakao.maps.CustomOverlay({ position: pos, content: el, yAnchor: 0.5, xAnchor: 0.5 });
+    overlay.setMap(mapInstance);
+    mapOverlays.push(overlay);
+    bounds.extend(pos);
+  });
+
+  const visibleCourses = settings.typeFilter === 'all'
+    ? lastComputed.courses
+    : lastComputed.courses.filter(c => c.type === settings.typeFilter);
+
+  visibleCourses.forEach(c => {
+    const el = document.createElement('div');
+    el.className = 'map-course-dot';
+    el.innerHTML = '<i class="ti ti-flag"></i>';
+    el.addEventListener('click', () => openCourseDetailSheet(c.id));
+    const pos = new kakao.maps.LatLng(c.lat, c.lng);
+    const overlay = new kakao.maps.CustomOverlay({ position: pos, content: el, yAnchor: 0.5, xAnchor: 0.5 });
+    overlay.setMap(mapInstance);
+    mapOverlays.push(overlay);
+    bounds.extend(pos);
+  });
+
+  mapInstance.setBounds(bounds);
+
+  const info = document.getElementById('mapInfo');
+  if (info) {
+    const filterNote = settings.typeFilter === 'all' ? '' : ` 중 ${settings.typeFilter} ${visibleCourses.length}곳 표시 중`;
+    info.innerHTML = `탐색 반경: 동행자별 직선거리 약 <b>${lastComputed.usedTimeH}시간</b> 상당(약 ${lastComputed.usedRadiusKm}km) 교집합 · 후보 ${lastComputed.courses.length}곳${filterNote}`;
+  }
+}
+
+function openCourseDetailSheet(courseId) {
+  const c = COURSES.find(x => x.id === courseId);
+  if (!c) return;
+  const isVisited = !!visited[c.id];
+  document.getElementById('courseDetailTitle').textContent = c.name;
+  document.getElementById('courseDetailAddr').textContent = c.address || c.region;
+  const badge = document.getElementById('courseDetailBadge');
+  badge.className = 'badge' + (c.type === '대중제' ? ' public' : '');
+  badge.textContent = c.type;
+  const visitBtn = document.getElementById('courseDetailVisitBtn');
+  visitBtn.className = 'btn-secondary' + (isVisited ? ' on' : '');
+  visitBtn.innerHTML = `<i class="ti ti-check"></i>${isVisited ? '방문함' : '방문 체크'}`;
+  visitBtn.onclick = () => { toggleVisited(c.id); openCourseDetailSheet(c.id); };
+  document.getElementById('courseDetailKakaoBtn').onclick = () => openKakaoGolf(c.id);
+  openSheet(document.getElementById('courseDetailSheet'));
 }
 
 function toggleVisited(courseId) {
   if (visited[courseId]) delete visited[courseId];
   else visited[courseId] = { date: new Date().toISOString().slice(0, 10) };
   save('mygolf_visited', visited);
-  renderCourseList();
 }
 
 function openKakaoGolf(courseId) {

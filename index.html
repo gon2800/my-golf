@@ -528,10 +528,10 @@ function updateCacheStats() {
   document.getElementById('statGeo').textContent = Object.keys(geoCache).length + '개';
   document.getElementById('statTravel').textContent = Object.keys(travelCache).length + '건';
 }
-function clearAllCache() {
+async function clearAllCache() {
   geoCache = {}; travelCache = {};
   save('mygolf_geo', geoCache); save('mygolf_travel', travelCache);
-  COURSES.forEach(c => { delete c.lat; delete c.lng; delete c.address; });
+  await loadCourses(); // 골프장 목록에 내장된 좌표는 유지한 채, 런타임에 지오코딩했던 캐시만 걷어낸다
   lastComputed = null;
   updateCacheStats();
   toast('캐시를 초기화했습니다');

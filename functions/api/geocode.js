@@ -43,9 +43,13 @@ async function tryAddressSearch(q, headers) {
 }
 
 async function tryKeywordSearch(q, headers) {
-  // 분당 기준 반경 우선 정렬 (사업장명/장소명 검색 폴백)
+  // x/y만 넘기면 결과를 배제하지 않고 가까운 순으로 "정렬"만 해준다 (분당 기준 소프트 바이어스).
+  // radius를 함께 넘기면 그 범위 밖은 아예 결과에서 제외되는 하드 필터가 되므로 쓰지 않는다 —
+  // 안 그러면 분당에서 먼 골프장(강원/영남/호남/제주 등)은 지오코딩 자체가 불가능해진다.
+  // (참고: radius를 쓰더라도 Kakao API 제약상 최댓값은 20000m이며, 이전에 50000을 넘겨
+  //  모든 키워드 검색이 400으로 실패하던 버그가 있었다.)
   const res = await fetch(
-    `https://dapi.kakao.com/v2/local/search/keyword.json?query=${encodeURIComponent(q)}&x=${BUNDANG.lng}&y=${BUNDANG.lat}&radius=50000`,
+    `https://dapi.kakao.com/v2/local/search/keyword.json?query=${encodeURIComponent(q)}&x=${BUNDANG.lng}&y=${BUNDANG.lat}`,
     { headers }
   );
   const status = res.status;

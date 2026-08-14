@@ -1,0 +1,874 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#F5F6FB">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="My Golf">
+<link rel="manifest" href="/manifest.json">
+<link rel="apple-touch-icon" href="/icons/icon-192.png">
+<title>My Golf</title>
+<style>
+:root{
+  --bg:#F5F6FB; --card:#FFFFFF; --ink:#1F2437; --sub:#7A809A;
+  --line:#EBEDF4; --line-strong:#D3D8E6; --accent:#5B54E8; --accent-dark:#4C46D6; --accent-soft:#EEEDFD;
+  --danger:#EF6C6C; --danger-soft:#FDECEC;
+  --shadow:0 1px 2px rgba(31,36,55,.04),0 8px 24px rgba(31,36,55,.06);
+  --radius:18px;
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
+html,body{height:100%;background:var(--bg);}
+body{font-family:-apple-system,"Apple SD Gothic Neo","Noto Sans KR","Malgun Gothic",system-ui,sans-serif;display:flex;justify-content:center;align-items:flex-start;background:var(--bg);color:var(--ink);}
+
+#app{width:100%;max-width:430px;min-height:100dvh;background:var(--bg);display:flex;flex-direction:column;position:relative;overflow-x:hidden;}
+
+/* ── 헤더 ── */
+.app-header{background:transparent;padding:max(env(safe-area-inset-top),14px) 16px 10px;display:flex;align-items:center;gap:10px;flex-shrink:0;}
+.header-icon{width:42px;height:42px;border-radius:13px;overflow:hidden;flex-shrink:0;}
+.header-icon img{width:100%;height:100%;object-fit:cover;}
+.header-title{font-size:20px;font-weight:700;color:var(--ink);letter-spacing:-0.3px;}
+.header-settings{margin-left:auto;width:40px;height:40px;border-radius:9px;border:none;background:transparent;color:#000;font-size:22px;display:flex;align-items:center;justify-content:center;}
+.header-settings:active{background:rgba(0,0,0,.06);}
+
+/* ── 탭바 (견출지 스타일) ── */
+.tab-bar{display:flex;padding:0 10px;overflow-x:auto;background:transparent;flex-shrink:0;}
+.tab-bar::-webkit-scrollbar{display:none;}
+.tab-item{position:relative;flex:1;min-width:66px;padding:11px 2px 10px;text-align:center;font-size:14px;font-weight:700;color:var(--sub);background:transparent;border-radius:8px 8px 0 0;cursor:pointer;white-space:nowrap;user-select:none;}
+.tab-item.active{background:var(--card);color:var(--accent);font-weight:800;border-bottom:1px solid var(--card);margin-bottom:-1px;}
+.tab-item.active::before,.tab-item.active::after{content:"";position:absolute;bottom:0;width:8px;height:8px;pointer-events:none;}
+.tab-item.active::before{left:-8px;background:radial-gradient(circle at top left, transparent 8px, var(--card) 8px);}
+.tab-item.active::after{right:-8px;background:radial-gradient(circle at top right, transparent 8px, var(--card) 8px);}
+.tab-item:first-child.active::before{content:none;}
+.tab-item:last-child.active::after{content:none;}
+.tab-item:first-child.active{border-top-left-radius:var(--radius);}
+.tab-item:last-child.active{border-top-right-radius:var(--radius);}
+.tab-item .ti{display:block;font-size:19px;margin-bottom:3px;}
+
+/* ── 스크린 / 카드 ── */
+.screens{position:relative;flex:1;overflow:hidden;}
+.screen{display:none;padding:0 10px 10px;overflow-y:auto;position:absolute;top:0;left:0;width:100%;height:100%;touch-action:pan-y;}
+.screen.active{display:block;}
+.tab-card{background:var(--card);border-radius:var(--radius);box-shadow:var(--shadow);padding:14px 14px 74px;min-height:220px;position:relative;}
+.tab-card + .tab-card{margin-top:12px;}
+.tab-card.corner-first{border-radius:0 var(--radius) var(--radius) var(--radius);}
+.tab-card.corner-last{border-radius:var(--radius) 0 var(--radius) var(--radius);}
+.tab-card.compact{padding-bottom:16px;min-height:0;}
+
+/* ── 버튼 ── */
+.btn-primary{width:100%;height:46px;border-radius:14px;background:var(--accent);color:#fff;border:none;font-size:16px;font-weight:700;}
+.btn-primary:active{background:var(--accent-dark);}
+.btn-primary:disabled{opacity:.5;}
+.btn-secondary{height:40px;padding:0 14px;border-radius:10px;border:2px solid var(--line);background:var(--card);color:var(--sub);font-size:13px;font-weight:700;display:inline-flex;align-items:center;gap:6px;}
+.btn-secondary:active{background:var(--accent-soft);color:var(--accent);border-color:var(--accent);}
+.btn-secondary.on{background:var(--accent-soft);color:var(--accent);border-color:var(--accent);}
+.icon-btn{width:34px;height:34px;border-radius:9px;border:none;background:var(--danger-soft);color:var(--danger);font-size:15px;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.icon-btn.neutral{background:var(--bg);color:var(--sub);}
+.fab{position:absolute;bottom:16px;right:16px;width:44px;height:44px;background:var(--accent);border:none;border-radius:50%;color:#fff;box-shadow:0 2px 8px rgba(91,86,200,.4);font-size:22px;display:flex;align-items:center;justify-content:center;}
+.fab:active{background:var(--accent-dark);}
+
+/* ── 입력 필드 ── */
+.field-row{margin-bottom:12px;}
+.field-row label{display:block;font-size:12px;font-weight:700;color:var(--sub);margin-bottom:5px;}
+.field-row input{width:100%;height:40px;border-radius:10px;border:2px solid var(--accent);padding:0 10px;font-size:15px;font-weight:500;background:var(--card);color:var(--ink);}
+.field-row select{width:100%;height:40px;border-radius:10px;border:1.5px solid var(--line);padding:0 8px;font-size:15px;font-weight:700;background:var(--bg);color:var(--ink);-webkit-appearance:none;}
+
+/* ── 바텀 시트 ── */
+.sheet{position:fixed;left:0;right:0;bottom:0;background:var(--card);border-radius:24px 24px 0 0;padding:8px 20px calc(20px + env(safe-area-inset-bottom));transform:translateY(100%);transition:transform .25s cubic-bezier(.32,.72,0,1);z-index:21;max-width:430px;margin:0 auto;max-height:86vh;overflow-y:auto;}
+.sheet.show{transform:translateY(0);}
+.handle{width:40px;height:4px;background:var(--line);border-radius:3px;margin:6px auto 14px;}
+.sheet-title{font-size:17px;font-weight:800;color:var(--ink);margin-bottom:14px;}
+
+/* ── 오버레이 / 토스트 ── */
+#overlay{position:fixed;inset:0;background:rgba(15,17,30,.42);z-index:20;opacity:0;pointer-events:none;transition:opacity .2s ease;}
+#overlay.show{opacity:1;pointer-events:auto;}
+#toast{position:fixed;left:50%;bottom:30px;transform:translateX(-50%) translateY(20px);background:rgba(31,36,55,.92);color:#fff;padding:10px 18px;border-radius:20px;font-size:13px;font-weight:600;z-index:60;opacity:0;pointer-events:none;transition:opacity .2s ease, transform .2s ease;max-width:86%;text-align:center;}
+#toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+
+/* ══ 모임 탭 ══ */
+.empty-state{padding:40px 10px;text-align:center;color:var(--sub);font-size:13px;line-height:1.7;}
+.empty-state .ti{font-size:32px;color:var(--line-strong);display:block;margin-bottom:10px;}
+.group-card{background:var(--bg);border-radius:14px;padding:14px;margin-bottom:10px;cursor:pointer;}
+.group-card:last-child{margin-bottom:0;}
+.group-card.selected{background:var(--accent-soft);border:2px solid var(--accent);padding:12px;}
+.group-card-top{display:flex;align-items:center;gap:8px;}
+.group-name{font-size:15px;font-weight:800;color:var(--ink);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.group-members{font-size:12px;color:var(--sub);margin-top:6px;line-height:1.5;}
+.group-actions{display:flex;gap:6px;flex-shrink:0;}
+
+.member-row{display:flex;gap:8px;align-items:center;margin-bottom:8px;}
+.member-row input{flex:1;min-width:0;height:40px;border-radius:10px;border:1.5px solid var(--line);padding:0 10px;font-size:14px;background:var(--card);color:var(--ink);}
+.member-row input:focus{outline:none;border-color:var(--accent);}
+.member-name-input{flex:0.9 !important;}
+.member-addr-input{flex:1.4 !important;}
+.add-member-btn{width:100%;height:38px;border-radius:10px;background:var(--accent-soft);color:var(--accent);border:none;font-size:13px;font-weight:700;margin:2px 0 16px;display:flex;align-items:center;justify-content:center;gap:5px;}
+
+/* ══ 후보 탭 ══ */
+.chip-row{display:flex;gap:7px;overflow-x:auto;padding-bottom:2px;}
+.chip-row::-webkit-scrollbar{display:none;}
+.group-chip{flex-shrink:0;padding:8px 14px;border-radius:20px;background:var(--bg);border:1.5px solid var(--line);font-size:13px;font-weight:700;color:var(--sub);white-space:nowrap;}
+.group-chip.active{background:var(--accent);border-color:var(--accent);color:#fff;}
+
+.ctrl-label{font-size:11px;font-weight:700;color:var(--sub);margin:14px 0 6px;}
+.ctrl-label:first-child{margin-top:0;}
+.segment{display:flex;gap:4px;background:var(--bg);border-radius:11px;padding:3px;}
+.segment-item{flex:1;text-align:center;padding:8px 4px;border-radius:8px;font-size:12px;font-weight:700;color:var(--sub);cursor:pointer;white-space:nowrap;}
+.segment-item.active{background:var(--card);color:var(--accent);box-shadow:0 1px 2px rgba(31,36,55,.08);}
+
+.calc-btn-row{margin-top:16px;}
+.calc-progress{font-size:12px;color:var(--accent);text-align:center;margin-top:8px;}
+
+.course-list{margin-top:14px;}
+.course-card{background:var(--bg);border-radius:14px;padding:14px;margin-bottom:10px;}
+.course-card:last-child{margin-bottom:0;}
+.course-card-top{display:flex;align-items:flex-start;gap:8px;}
+.course-name{font-size:15px;font-weight:800;color:var(--ink);flex:1;min-width:0;}
+.course-addr{font-size:11px;color:var(--sub);margin-top:3px;}
+.badge{display:inline-block;padding:3px 9px;border-radius:7px;font-size:11px;font-weight:700;background:var(--accent-soft);color:var(--accent);flex-shrink:0;}
+.badge.public{background:#E9F7EF;color:#2E9E5B;}
+.badge.visited{background:#FFF3D9;color:#B4790C;}
+.badge.warn{background:var(--danger-soft);color:var(--danger);}
+.course-badges{display:flex;gap:5px;flex-wrap:wrap;flex-shrink:0;}
+
+.member-time-list{margin-top:10px;background:var(--card);border-radius:10px;padding:8px 10px;}
+.member-time-row{display:flex;justify-content:space-between;align-items:center;padding:4px 0;font-size:13px;}
+.member-time-row .mn{color:var(--ink);font-weight:600;}
+.member-time-row .mt{color:var(--sub);font-weight:700;}
+.member-time-row.worst .mt{color:var(--danger);}
+.course-summary{font-size:12px;color:var(--sub);margin-top:8px;line-height:1.6;}
+.course-summary b{color:var(--accent);}
+.course-btn-row{display:flex;gap:8px;margin-top:12px;}
+.course-btn-row .btn-secondary{flex:1;justify-content:center;}
+
+/* ══ 설정 시트 ══ */
+.settings-help{font-size:11px;color:var(--sub);line-height:1.6;margin:-4px 0 14px;}
+.cache-stat{display:flex;justify-content:space-between;font-size:12px;color:var(--sub);padding:6px 0;border-bottom:1px solid var(--line);}
+.cache-stat:last-of-type{border-bottom:none;}
+
+.hidden{display:none !important;}
+
+@import url('https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.19.0/dist/tabler-icons.min.css');
+</style>
+</head>
+<body>
+<div id="app">
+
+  <div class="app-header">
+    <div class="header-icon"><img src="/icons/icon-192.png" alt="My Golf"></div>
+    <span class="header-title">My Golf</span>
+    <button class="header-settings" onclick="openSettingsSheet()"><i class="ti ti-settings"></i></button>
+  </div>
+
+  <div class="tab-bar">
+    <div class="tab-item active" onclick="switchTab('group')"><i class="ti ti-users"></i>모임</div>
+    <div class="tab-item" onclick="switchTab('candidates')"><i class="ti ti-map-pin"></i>후보</div>
+    <div class="tab-item" onclick="switchTab('history')"><i class="ti ti-history"></i>이력</div>
+  </div>
+
+  <div class="screens">
+    <!-- ═══ 모임 ═══ -->
+    <div id="screen-group" class="screen active">
+      <div class="tab-card corner-first">
+        <div id="groupListWrap"></div>
+      </div>
+      <button class="fab" onclick="openGroupSheet()"><i class="ti ti-plus"></i></button>
+    </div>
+
+    <!-- ═══ 후보 ═══ -->
+    <div id="screen-candidates" class="screen">
+      <div class="tab-card compact">
+        <div class="ctrl-label">모임 선택</div>
+        <div class="chip-row" id="groupChipRow"></div>
+      </div>
+
+      <div id="candidatesBody">
+        <div class="tab-card">
+          <div class="empty-state">
+            <i class="ti ti-map-pin-off"></i>
+            모임 탭에서 모임을 먼저 만들고<br>선택해주세요
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══ 이력 ═══ -->
+    <div id="screen-history" class="screen">
+      <div class="tab-card corner-last">
+        <div id="historyListWrap"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 모임 편집 시트 -->
+<div class="sheet" id="groupSheet">
+  <div class="handle"></div>
+  <div class="sheet-title" id="groupSheetTitle">모임 만들기</div>
+  <div class="field-row">
+    <label>모임 이름</label>
+    <input id="groupNameInput" type="text" placeholder="예: 주말 라운딩">
+  </div>
+  <div class="ctrl-label" style="margin-top:0;">동행자</div>
+  <div id="memberRowsWrap"></div>
+  <button class="add-member-btn" onclick="addMemberRow()" type="button"><i class="ti ti-plus"></i>동행자 추가</button>
+  <button class="btn-primary" onclick="saveGroup()">저장</button>
+</div>
+
+<!-- 설정 시트 -->
+<div class="sheet" id="settingsSheet">
+  <div class="handle"></div>
+  <div class="sheet-title">설정</div>
+  <div class="field-row">
+    <label>Kakao REST API 키</label>
+    <input id="kakaoKeyInput" type="text" placeholder="Kakao Developers REST API 키" autocomplete="off">
+  </div>
+  <div class="settings-help">
+    Kakao Developers 앱에서 <b>로컬</b>(주소·장소 검색)과 <b>모빌리티 – 길찾기</b> 제품을 활성화하고,
+    앱 설정 &gt; 플랫폼 &gt; Web에 이 사이트 도메인을 등록해야 정상 동작합니다.
+  </div>
+  <button class="btn-primary" onclick="saveSettings()">저장</button>
+
+  <div class="ctrl-label">캐시 현황</div>
+  <div class="cache-stat"><span>골프장 좌표 캐시</span><span id="statGeo">0개</span></div>
+  <div class="cache-stat"><span>이동시간 캐시</span><span id="statTravel">0건</span></div>
+  <button class="btn-secondary" style="margin-top:12px;width:100%;justify-content:center;" onclick="clearAllCache()">
+    <i class="ti ti-trash"></i>캐시 전체 초기화
+  </button>
+</div>
+
+<div id="overlay" onclick="closeAllSheets()"></div>
+<div id="toast"></div>
+
+<script>
+'use strict';
+
+/* ══════════════════════════════
+   상수
+══════════════════════════════ */
+const BUNDANG = { lat: 37.3825, lng: 127.1191 }; // 분당구청 인근 기준점
+const STRAIGHT_LINE_RADIUS_KM = 55; // 1차 필터: 넉넉하게 잡고 실제 시간은 API로 확정
+const TIME_COEF = { dawn: 1.0, morning: 1.2, lunch: 1.1 };
+const TIME_LABELS = { dawn: '새벽', morning: '오전', lunch: '점심' };
+const KAKAO_LOCAL_URL = 'https://dapi.kakao.com/v2/local/search/keyword.json';
+const KAKAO_ADDR_URL = 'https://dapi.kakao.com/v2/local/search/address.json';
+const KAKAO_DIRECTIONS_URL = 'https://apis-navi.kakaomobility.com/v1/directions';
+
+/* ══════════════════════════════
+   저장소 헬퍼
+══════════════════════════════ */
+function load(key, fallback) {
+  try { const v = localStorage.getItem(key); return v ? JSON.parse(v) : fallback; }
+  catch { return fallback; }
+}
+function save(key, val) { localStorage.setItem(key, JSON.stringify(val)); }
+
+let groups = load('mygolf_groups', []);
+let selectedGroupId = load('mygolf_selectedGroup', null);
+let visited = load('mygolf_visited', {});
+let settings = load('mygolf_settings', { kakaoKey: '', timeSlot: 'morning', sortMode: 'minimax', typeFilter: 'all' });
+let geoCache = load('mygolf_geo', {});
+let travelCache = load('mygolf_travel', {});
+
+let COURSES = [];
+let lastComputed = null; // { groupId, rows: [...] }
+
+/* ══════════════════════════════
+   탭 전환
+══════════════════════════════ */
+const TABS = ['group', 'candidates', 'history'];
+let currentTab = 'group';
+let tabSwitching = false;
+function switchTab(t) {
+  if (t === currentTab || tabSwitching) return;
+  const idx = TABS.indexOf(t);
+  const curIdx = TABS.indexOf(currentTab);
+  const forward = idx > curIdx;
+
+  const oldScreen = document.getElementById('screen-' + currentTab);
+  const newScreen = document.getElementById('screen-' + t);
+  currentTab = t;
+
+  document.querySelectorAll('.tab-item').forEach((el, i) => el.classList.toggle('active', TABS[i] === t));
+  const card = newScreen.querySelector('.tab-card');
+  if (card) {
+    card.classList.toggle('corner-first', idx === 0);
+    card.classList.toggle('corner-last', idx === TABS.length - 1);
+  }
+
+  if (t === 'candidates') renderCandidatesTab();
+  if (t === 'history') renderHistory();
+
+  tabSwitching = true;
+  newScreen.style.transition = 'none';
+  newScreen.style.transform = `translateX(${forward ? 100 : -100}%)`;
+  newScreen.classList.add('active');
+  oldScreen.style.transition = 'none';
+  oldScreen.style.transform = 'translateX(0)';
+
+  void newScreen.offsetWidth;
+
+  requestAnimationFrame(() => {
+    oldScreen.style.transition = newScreen.style.transition = 'transform .25s ease';
+    oldScreen.style.transform = `translateX(${forward ? -100 : 100}%)`;
+    newScreen.style.transform = 'translateX(0)';
+  });
+
+  let cleaned = false;
+  const cleanup = () => {
+    if (cleaned) return;
+    cleaned = true;
+    oldScreen.classList.remove('active');
+    oldScreen.style.transition = oldScreen.style.transform = '';
+    newScreen.style.transition = newScreen.style.transform = '';
+    tabSwitching = false;
+    newScreen.removeEventListener('transitionend', cleanup);
+  };
+  newScreen.addEventListener('transitionend', cleanup);
+  setTimeout(cleanup, 300);
+}
+
+/* ── 탭바 영역에서만 스와이프 ── */
+(function initTabSwipe() {
+  const SWIPE_MIN_X = 50, SWIPE_MAX_Y = 80, SWIPE_MAX_TIME = 600, INTENT_THRESHOLD = 10;
+  let startX = 0, startY = 0, startT = 0, lastX = 0, lastY = 0, tracking = false, swiping = false;
+
+  function resolveSwipe(dx, dy, dt) {
+    if (dt > SWIPE_MAX_TIME) return;
+    if (Math.abs(dx) < SWIPE_MIN_X || Math.abs(dy) > SWIPE_MAX_Y) return;
+    const idx = TABS.indexOf(currentTab);
+    if (dx < 0 && idx < TABS.length - 1) switchTab(TABS[idx + 1]);
+    else if (dx > 0 && idx > 0) switchTab(TABS[idx - 1]);
+  }
+
+  const bar = document.querySelector('.tab-bar');
+  bar.addEventListener('touchstart', e => {
+    if (e.touches.length !== 1) { tracking = false; return; }
+    tracking = true; swiping = false;
+    startX = lastX = e.touches[0].clientX;
+    startY = lastY = e.touches[0].clientY;
+    startT = Date.now();
+  }, { passive: true });
+
+  bar.addEventListener('touchmove', e => {
+    if (!tracking || e.touches.length !== 1) return;
+    lastX = e.touches[0].clientX; lastY = e.touches[0].clientY;
+    const dx = lastX - startX, dy = lastY - startY;
+    if (!swiping) {
+      if (Math.abs(dx) < INTENT_THRESHOLD && Math.abs(dy) < INTENT_THRESHOLD) return;
+      if (Math.abs(dx) <= Math.abs(dy)) { tracking = false; return; }
+      swiping = true;
+    }
+    e.preventDefault();
+  }, { passive: false });
+
+  bar.addEventListener('touchend', e => {
+    if (!tracking) return;
+    tracking = false;
+    if (!swiping) return;
+    swiping = false;
+    const touch = e.changedTouches[0];
+    resolveSwipe(touch.clientX - startX, touch.clientY - startY, Date.now() - startT);
+  }, { passive: true });
+
+  bar.addEventListener('touchcancel', () => {
+    if (!tracking) return;
+    tracking = false;
+    if (!swiping) return;
+    swiping = false;
+    resolveSwipe(lastX - startX, lastY - startY, Date.now() - startT);
+  }, { passive: true });
+})();
+
+/* ══════════════════════════════
+   시트 / 오버레이 / 토스트
+══════════════════════════════ */
+const overlay = document.getElementById('overlay');
+function openSheet(el) {
+  const wasOpen = !!document.querySelector('.sheet.show');
+  overlay.classList.add('show');
+  el.classList.add('show');
+  if (!wasOpen) history.pushState({ mygolfSheet: true }, '');
+}
+function closeAllSheets() {
+  overlay.classList.remove('show');
+  document.querySelectorAll('.sheet').forEach(s => s.classList.remove('show'));
+}
+let toastTimer = null;
+function toast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), 1800);
+}
+
+/* ══════════════════════════════
+   안드로이드 뒤로가기 방어
+══════════════════════════════ */
+function armBackTrap() { history.pushState({ mygolfTrap: true }, ''); }
+window.addEventListener('popstate', () => {
+  if (document.querySelector('.sheet.show')) { closeAllSheets(); return; }
+  armBackTrap();
+});
+armBackTrap();
+
+/* ══════════════════════════════
+   유틸
+══════════════════════════════ */
+function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
+function haversineKm(lat1, lng1, lat2, lng2) {
+  const R = 6371;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLng = (lng2 - lng1) * Math.PI / 180;
+  const a = Math.sin(dLat / 2) ** 2 + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLng / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+function normAddrKey(s) { return 'addr:' + s.trim().replace(/\s+/g, ' '); }
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+/* ══════════════════════════════
+   모임 탭
+══════════════════════════════ */
+function renderGroupList() {
+  const wrap = document.getElementById('groupListWrap');
+  if (groups.length === 0) {
+    wrap.innerHTML = `<div class="empty-state"><i class="ti ti-users"></i>아직 모임이 없어요<br>오른쪽 아래 + 버튼으로 만들어보세요</div>`;
+    return;
+  }
+  wrap.innerHTML = groups.map(g => {
+    const preview = g.members.map(m => `${m.name}(${m.addr || '동네 미입력'})`).join(', ');
+    const sel = g.id === selectedGroupId;
+    return `
+    <div class="group-card ${sel ? 'selected' : ''}" onclick="selectGroup('${g.id}')">
+      <div class="group-card-top">
+        <div class="group-name">${escapeHtml(g.name)}</div>
+        <div class="group-actions">
+          <button class="icon-btn neutral" onclick="event.stopPropagation();openGroupSheet('${g.id}')"><i class="ti ti-pencil"></i></button>
+          <button class="icon-btn" onclick="event.stopPropagation();deleteGroup('${g.id}')"><i class="ti ti-trash"></i></button>
+        </div>
+      </div>
+      <div class="group-members">${g.members.length}명 · ${escapeHtml(preview)}</div>
+    </div>`;
+  }).join('');
+}
+
+function escapeHtml(s) {
+  return String(s || '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
+function selectGroup(id) {
+  selectedGroupId = id;
+  save('mygolf_selectedGroup', selectedGroupId);
+  renderGroupList();
+  switchTab('candidates');
+}
+
+function deleteGroup(id) {
+  groups = groups.filter(g => g.id !== id);
+  save('mygolf_groups', groups);
+  if (selectedGroupId === id) { selectedGroupId = null; save('mygolf_selectedGroup', null); }
+  renderGroupList();
+  toast('모임을 삭제했습니다');
+}
+
+let editingGroupId = null;
+function openGroupSheet(id) {
+  editingGroupId = id || null;
+  const g = id ? groups.find(x => x.id === id) : null;
+  document.getElementById('groupSheetTitle').textContent = g ? '모임 수정' : '모임 만들기';
+  document.getElementById('groupNameInput').value = g ? g.name : '';
+  const wrap = document.getElementById('memberRowsWrap');
+  wrap.innerHTML = '';
+  const members = g ? g.members : [{ name: '', addr: '' }, { name: '', addr: '' }];
+  members.forEach(m => addMemberRow(m.name, m.addr));
+  openSheet(document.getElementById('groupSheet'));
+}
+
+function addMemberRow(name = '', addr = '') {
+  const wrap = document.getElementById('memberRowsWrap');
+  const row = document.createElement('div');
+  row.className = 'member-row';
+  row.innerHTML = `
+    <input class="member-name-input" type="text" placeholder="이름" value="${escapeHtml(name)}">
+    <input class="member-addr-input" type="text" placeholder="동네 (예: 성남시 분당구 정자동)" value="${escapeHtml(addr)}">
+    <button class="icon-btn" type="button" onclick="this.parentElement.remove()"><i class="ti ti-x"></i></button>
+  `;
+  wrap.appendChild(row);
+}
+
+function saveGroup() {
+  const name = document.getElementById('groupNameInput').value.trim();
+  if (!name) { toast('모임 이름을 입력하세요'); return; }
+  const rows = [...document.querySelectorAll('#memberRowsWrap .member-row')];
+  const members = rows.map(r => {
+    const [nameEl, addrEl] = r.querySelectorAll('input');
+    return { id: uid(), name: nameEl.value.trim(), addr: addrEl.value.trim() };
+  }).filter(m => m.name && m.addr);
+  if (members.length === 0) { toast('동행자를 1명 이상 입력하세요'); return; }
+
+  if (editingGroupId) {
+    const g = groups.find(x => x.id === editingGroupId);
+    g.name = name; g.members = members;
+  } else {
+    groups.push({ id: uid(), name, members });
+  }
+  save('mygolf_groups', groups);
+  closeAllSheets();
+  renderGroupList();
+  renderGroupChips();
+  toast('저장되었습니다');
+}
+
+/* ══════════════════════════════
+   설정 시트
+══════════════════════════════ */
+function openSettingsSheet() {
+  document.getElementById('kakaoKeyInput').value = settings.kakaoKey || '';
+  updateCacheStats();
+  openSheet(document.getElementById('settingsSheet'));
+}
+function updateCacheStats() {
+  document.getElementById('statGeo').textContent = Object.keys(geoCache).length + '개';
+  document.getElementById('statTravel').textContent = Object.keys(travelCache).length + '건';
+}
+function saveSettings() {
+  settings.kakaoKey = document.getElementById('kakaoKeyInput').value.trim();
+  save('mygolf_settings', settings);
+  closeAllSheets();
+  toast('설정을 저장했습니다');
+}
+function clearAllCache() {
+  geoCache = {}; travelCache = {};
+  save('mygolf_geo', geoCache); save('mygolf_travel', travelCache);
+  COURSES.forEach(c => { delete c.lat; delete c.lng; delete c.address; });
+  lastComputed = null;
+  updateCacheStats();
+  toast('캐시를 초기화했습니다');
+}
+
+/* ══════════════════════════════
+   카카오 API
+══════════════════════════════ */
+function kakaoHeaders() {
+  return { Authorization: 'KakaoAK ' + settings.kakaoKey };
+}
+async function kakaoGeocode(query) {
+  const key = normAddrKey(query);
+  if (geoCache[key]) return geoCache[key];
+  // 주소 검색 우선 시도
+  let res = await fetch(`${KAKAO_ADDR_URL}?query=${encodeURIComponent(query)}`, { headers: kakaoHeaders() });
+  let data = await res.json();
+  let doc = data.documents && data.documents[0];
+  if (!doc) {
+    // 실패 시 키워드 검색으로 폴백 (분당 기준 반경 우선 정렬)
+    res = await fetch(`${KAKAO_LOCAL_URL}?query=${encodeURIComponent(query)}&x=${BUNDANG.lng}&y=${BUNDANG.lat}&radius=50000`, { headers: kakaoHeaders() });
+    data = await res.json();
+    doc = data.documents && data.documents[0];
+  }
+  if (!doc) return null;
+  const lat = parseFloat(doc.y || (doc.address && doc.address.y));
+  const lng = parseFloat(doc.x || (doc.address && doc.address.x));
+  const address = doc.address_name || doc.road_address_name || query;
+  const result = { lat, lng, address, ts: Date.now() };
+  geoCache[key] = result;
+  save('mygolf_geo', geoCache);
+  return result;
+}
+async function kakaoDirections(originLat, originLng, destLat, destLng) {
+  const url = `${KAKAO_DIRECTIONS_URL}?origin=${originLng},${originLat}&destination=${destLng},${destLat}&priority=RECOMMEND`;
+  const res = await fetch(url, { headers: kakaoHeaders() });
+  const data = await res.json();
+  const route = data.routes && data.routes[0];
+  if (!route || route.result_code !== 0) return null;
+  const s = route.summary;
+  return { min: Math.round(s.duration / 60), km: Math.round(s.distance / 100) / 10 };
+}
+
+/* ══════════════════════════════
+   골프장 데이터 로드
+══════════════════════════════ */
+async function loadCourses() {
+  const res = await fetch('/data/golf-courses.json');
+  const base = await res.json();
+  COURSES = base.map(c => {
+    const cached = geoCache['course:' + c.id];
+    return cached ? { ...c, lat: cached.lat, lng: cached.lng, address: cached.address } : { ...c };
+  });
+}
+
+/* ══════════════════════════════
+   후보 탭
+══════════════════════════════ */
+function renderGroupChips() {
+  const row = document.getElementById('groupChipRow');
+  if (groups.length === 0) {
+    row.innerHTML = `<span style="font-size:12px;color:var(--sub);">모임을 먼저 만들어주세요</span>`;
+    return;
+  }
+  row.innerHTML = groups.map(g =>
+    `<div class="group-chip ${g.id === selectedGroupId ? 'active' : ''}" onclick="selectGroup('${g.id}')">${escapeHtml(g.name)}</div>`
+  ).join('');
+}
+
+function renderCandidatesTab() {
+  renderGroupChips();
+  const body = document.getElementById('candidatesBody');
+  const group = groups.find(g => g.id === selectedGroupId);
+
+  if (!group) {
+    body.innerHTML = `<div class="tab-card"><div class="empty-state"><i class="ti ti-map-pin-off"></i>모임 탭에서 모임을 먼저 만들고<br>선택해주세요</div></div>`;
+    return;
+  }
+
+  const hasData = lastComputed && lastComputed.groupId === group.id;
+
+  body.innerHTML = `
+    <div class="tab-card">
+      <div class="ctrl-label" style="margin-top:0;">시간대</div>
+      <div class="segment" id="timeSlotSeg">
+        ${Object.keys(TIME_LABELS).map(k => `<div class="segment-item ${settings.timeSlot === k ? 'active' : ''}" onclick="setTimeSlot('${k}')">${TIME_LABELS[k]}</div>`).join('')}
+      </div>
+
+      <div class="ctrl-label">정렬</div>
+      <div class="segment">
+        <div class="segment-item ${settings.sortMode === 'minimax' ? 'active' : ''}" onclick="setSortMode('minimax')">최댓값 최소화</div>
+        <div class="segment-item ${settings.sortMode === 'sum' ? 'active' : ''}" onclick="setSortMode('sum')">합계 최소화</div>
+      </div>
+
+      <div class="ctrl-label">시설 구분</div>
+      <div class="segment">
+        <div class="segment-item ${settings.typeFilter === 'all' ? 'active' : ''}" onclick="setTypeFilter('all')">전체</div>
+        <div class="segment-item ${settings.typeFilter === '회원제' ? 'active' : ''}" onclick="setTypeFilter('회원제')">회원제</div>
+        <div class="segment-item ${settings.typeFilter === '대중제' ? 'active' : ''}" onclick="setTypeFilter('대중제')">대중제</div>
+      </div>
+
+      <div class="calc-btn-row">
+        <button class="btn-primary" id="calcBtn" onclick="runCalculation(false)">
+          <i class="ti ti-refresh" style="vertical-align:-2px;"></i> ${hasData ? '이동시간 다시 계산' : '이동시간 계산하기'}
+        </button>
+        <div class="calc-progress hidden" id="calcProgress"></div>
+      </div>
+    </div>
+
+    <div class="tab-card" id="courseListCard">
+      ${hasData ? '' : `<div class="empty-state"><i class="ti ti-route"></i>"이동시간 계산하기"를 눌러<br>후보 골프장을 찾아보세요</div>`}
+      <div class="course-list" id="courseList"></div>
+    </div>
+  `;
+
+  if (hasData) renderCourseList();
+}
+
+function setTimeSlot(k) { settings.timeSlot = k; save('mygolf_settings', settings); renderCandidatesTab(); }
+function setSortMode(k) { settings.sortMode = k; save('mygolf_settings', settings); renderCandidatesTab(); }
+function setTypeFilter(k) { settings.typeFilter = k; save('mygolf_settings', settings); renderCandidatesTab(); }
+
+async function runCalculation() {
+  if (!settings.kakaoKey) { toast('설정에서 Kakao API 키를 먼저 입력하세요'); openSettingsSheet(); return; }
+  const group = groups.find(g => g.id === selectedGroupId);
+  if (!group) { toast('모임을 먼저 선택하세요'); return; }
+
+  const btn = document.getElementById('calcBtn');
+  const progress = document.getElementById('calcProgress');
+  btn.disabled = true;
+  progress.classList.remove('hidden');
+
+  try {
+    // 1) 골프장 좌표 확보 (미확보분만)
+    const needGeoCourses = COURSES.filter(c => !c.lat);
+    for (let i = 0; i < needGeoCourses.length; i++) {
+      const c = needGeoCourses[i];
+      progress.textContent = `골프장 위치 확인 중 (${i + 1}/${needGeoCourses.length})`;
+      try {
+        const g = await kakaoGeocode(`${c.region} ${c.name}`);
+        if (g) { c.lat = g.lat; c.lng = g.lng; c.address = g.address; geoCache['course:' + c.id] = g; save('mygolf_geo', geoCache); }
+      } catch (e) { /* 개별 실패는 건너뜀 */ }
+      await sleep(80);
+    }
+
+    // 2) 분당 기준 직선거리 1차 필터
+    const withDist = COURSES.filter(c => c.lat).map(c => ({ ...c, distFromBundang: haversineKm(BUNDANG.lat, BUNDANG.lng, c.lat, c.lng) }));
+    const filtered = withDist.filter(c => c.distFromBundang <= STRAIGHT_LINE_RADIUS_KM);
+
+    if (filtered.length === 0) {
+      toast('반경 내 골프장을 찾지 못했습니다. Kakao 키 설정을 확인하세요');
+      return;
+    }
+
+    // 3) 동행자 주소 지오코딩
+    for (let i = 0; i < group.members.length; i++) {
+      const m = group.members[i];
+      const key = normAddrKey(m.addr);
+      if (!geoCache[key]) {
+        progress.textContent = `동행자 위치 확인 중 (${i + 1}/${group.members.length})`;
+        try { await kakaoGeocode(m.addr); } catch (e) { /* skip */ }
+        await sleep(80);
+      }
+    }
+    const membersGeo = group.members.map(m => ({ ...m, geo: geoCache[normAddrKey(m.addr)] })).filter(m => m.geo);
+    if (membersGeo.length === 0) {
+      toast('동행자 동네 위치를 확인하지 못했습니다. 동/구 단위까지 정확히 입력해주세요');
+      return;
+    }
+
+    // 4) 이동시간 계산 (member x course), 캐시 없는 것만 API 호출
+    const total = membersGeo.length * filtered.length;
+    let done = 0;
+    for (const m of membersGeo) {
+      const originKey = normAddrKey(m.addr);
+      for (const c of filtered) {
+        const tKey = originKey + '__' + c.id;
+        done++;
+        if (!travelCache[tKey]) {
+          progress.textContent = `이동시간 계산 중 (${done}/${total})`;
+          try {
+            const r = await kakaoDirections(m.geo.lat, m.geo.lng, c.lat, c.lng);
+            travelCache[tKey] = r ? { min: r.min, km: r.km, ts: Date.now() } : { failed: true, ts: Date.now() };
+            save('mygolf_travel', travelCache);
+          } catch (e) {
+            travelCache[tKey] = { failed: true, ts: Date.now() };
+          }
+          await sleep(80);
+        }
+      }
+    }
+
+    // 5) 결과 취합
+    const rows = filtered.map(c => {
+      const memberTimes = membersGeo.map(m => {
+        const t = travelCache[normAddrKey(m.addr) + '__' + c.id];
+        return { name: m.name, min: t && !t.failed ? t.min : null };
+      });
+      return { course: c, memberTimes };
+    }).filter(r => r.memberTimes.every(mt => mt.min !== null));
+
+    lastComputed = { groupId: group.id, rows };
+    progress.textContent = '';
+    progress.classList.add('hidden');
+    btn.disabled = false;
+    renderCandidatesTab();
+    toast('계산이 완료되었습니다');
+  } catch (e) {
+    toast('계산 중 오류가 발생했습니다: ' + e.message);
+  } finally {
+    btn.disabled = false;
+    progress.classList.add('hidden');
+  }
+}
+
+function renderCourseList() {
+  const listEl = document.getElementById('courseList');
+  if (!lastComputed) { listEl.innerHTML = ''; return; }
+
+  const coef = TIME_COEF[settings.timeSlot];
+  let rows = lastComputed.rows.map(r => {
+    const times = r.memberTimes.map(mt => ({ name: mt.name, min: Math.round(mt.min * coef) }));
+    const maxMin = Math.max(...times.map(t => t.min));
+    const sumMin = times.reduce((a, t) => a + t.min, 0);
+    const worst = times.filter(t => t.min === maxMin).map(t => t.name);
+    const minMin = Math.min(...times.map(t => t.min));
+    return { course: r.course, times, maxMin, sumMin, worst, gap: maxMin - minMin };
+  });
+
+  if (settings.typeFilter !== 'all') rows = rows.filter(r => r.course.type === settings.typeFilter);
+
+  rows.sort((a, b) => settings.sortMode === 'minimax' ? (a.maxMin - b.maxMin) : (a.sumMin - b.sumMin));
+
+  if (rows.length === 0) {
+    listEl.innerHTML = `<div class="empty-state"><i class="ti ti-filter-off"></i>조건에 맞는 골프장이 없어요</div>`;
+    return;
+  }
+
+  listEl.innerHTML = rows.map(r => {
+    const c = r.course;
+    const isVisited = !!visited[c.id];
+    const typeClass = c.type === '대중제' ? 'public' : '';
+    return `
+    <div class="course-card">
+      <div class="course-card-top">
+        <div>
+          <div class="course-name">${escapeHtml(c.name)}</div>
+          <div class="course-addr">${escapeHtml(c.address || c.region)}</div>
+        </div>
+        <div class="course-badges">
+          <span class="badge ${typeClass}">${c.type}</span>
+          ${isVisited ? '<span class="badge visited">방문</span>' : ''}
+          ${r.maxMin > 60 ? '<span class="badge warn">60분 초과</span>' : ''}
+        </div>
+      </div>
+      <div class="member-time-list">
+        ${r.times.map(t => `<div class="member-time-row ${r.worst.includes(t.name) ? 'worst' : ''}"><span class="mn">${escapeHtml(t.name)}</span><span class="mt">${t.min}분</span></div>`).join('')}
+      </div>
+      <div class="course-summary">
+        <b>${escapeHtml(r.worst.join(', '))}</b>님이 가장 오래 이동해요 · 합계 <b>${r.sumMin}분</b> · 최대 <b>${r.maxMin}분</b> · 격차 ${r.gap}분
+      </div>
+      <div class="course-btn-row">
+        <button class="btn-secondary ${isVisited ? 'on' : ''}" onclick="toggleVisited('${c.id}')"><i class="ti ti-check"></i>${isVisited ? '방문함' : '방문 체크'}</button>
+        <button class="btn-secondary" onclick="openKakaoGolf('${c.id}')"><i class="ti ti-external-link"></i>카카오골프예약</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function toggleVisited(courseId) {
+  if (visited[courseId]) delete visited[courseId];
+  else visited[courseId] = { date: new Date().toISOString().slice(0, 10) };
+  save('mygolf_visited', visited);
+  renderCourseList();
+}
+
+function openKakaoGolf(courseId) {
+  const c = COURSES.find(x => x.id === courseId);
+  if (!c) return;
+  if (navigator.clipboard) {
+    navigator.clipboard.writeText(c.name).catch(() => {});
+  }
+  toast(`"${c.name}" 이름이 복사되었습니다. 검색창에 붙여넣으세요`);
+  window.open('https://www.kakao.golf/map-search', '_blank');
+}
+
+/* ══════════════════════════════
+   이력 탭
+══════════════════════════════ */
+function renderHistory() {
+  const wrap = document.getElementById('historyListWrap');
+  const entries = Object.entries(visited);
+  if (entries.length === 0) {
+    wrap.innerHTML = `<div class="empty-state"><i class="ti ti-history"></i>아직 방문 기록이 없어요<br>후보 탭에서 다녀온 골프장을 체크해보세요</div>`;
+    return;
+  }
+  const rows = entries.map(([id, v]) => {
+    const c = COURSES.find(x => x.id === id) || { name: id, region: '' };
+    return { c, v };
+  }).sort((a, b) => (b.v.date || '').localeCompare(a.v.date || ''));
+
+  wrap.innerHTML = rows.map(({ c, v }) => `
+    <div class="group-card">
+      <div class="group-card-top">
+        <div class="group-name">${escapeHtml(c.name)}</div>
+        <div class="group-actions">
+          <button class="icon-btn" onclick="toggleVisited('${c.id}');renderHistory();"><i class="ti ti-x"></i></button>
+        </div>
+      </div>
+      <div class="group-members">${escapeHtml(c.region || '')} · 방문일 ${v.date}</div>
+    </div>
+  `).join('');
+}
+
+/* ══════════════════════════════
+   부트
+══════════════════════════════ */
+(async function boot() {
+  renderGroupList();
+  renderGroupChips();
+  await loadCourses();
+  if (currentTab === 'candidates') renderCandidatesTab();
+})();
+
+if ('serviceWorker' in navigator && location.protocol !== 'file:') {
+  navigator.serviceWorker.register('/sw.js').catch(() => {});
+}
+</script>
+</body>
+</html>

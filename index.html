@@ -219,17 +219,12 @@ body{font-family:-apple-system,"Apple SD Gothic Neo","Noto Sans KR","Malgun Goth
 <div class="sheet" id="settingsSheet">
   <div class="handle"></div>
   <div class="sheet-title">설정</div>
-  <div class="field-row">
-    <label>Kakao REST API 키</label>
-    <input id="kakaoKeyInput" type="text" placeholder="Kakao Developers REST API 키" autocomplete="off">
+  <div class="settings-help" style="margin-top:0;">
+    골프장 위치·이동시간 계산은 서버(Cloudflare Pages Functions)에서 처리됩니다.
+    Kakao API 키는 브라우저에 노출되지 않습니다.
   </div>
-  <div class="settings-help">
-    Kakao Developers 앱에서 <b>로컬</b>(주소·장소 검색)과 <b>모빌리티 – 길찾기</b> 제품을 활성화하고,
-    앱 설정 &gt; 플랫폼 &gt; Web에 이 사이트 도메인을 등록해야 정상 동작합니다.
-  </div>
-  <button class="btn-primary" onclick="saveSettings()">저장</button>
 
-  <div class="ctrl-label">캐시 현황</div>
+  <div class="ctrl-label" style="margin-top:0;">캐시 현황</div>
   <div class="cache-stat"><span>골프장 좌표 캐시</span><span id="statGeo">0개</span></div>
   <div class="cache-stat"><span>이동시간 캐시</span><span id="statTravel">0건</span></div>
   <button class="btn-secondary" style="margin-top:12px;width:100%;justify-content:center;" onclick="clearAllCache()">
@@ -250,9 +245,8 @@ const BUNDANG = { lat: 37.3825, lng: 127.1191 }; // 분당구청 인근 기준�
 const STRAIGHT_LINE_RADIUS_KM = 55; // 1차 필터: 넉넉하게 잡고 실제 시간은 API로 확정
 const TIME_COEF = { dawn: 1.0, morning: 1.2, lunch: 1.1 };
 const TIME_LABELS = { dawn: '새벽', morning: '오전', lunch: '점심' };
-const KAKAO_LOCAL_URL = 'https://dapi.kakao.com/v2/local/search/keyword.json';
-const KAKAO_ADDR_URL = 'https://dapi.kakao.com/v2/local/search/address.json';
-const KAKAO_DIRECTIONS_URL = 'https://apis-navi.kakaomobility.com/v1/directions';
+const GEOCODE_API = '/api/geocode';
+const DIRECTIONS_API = '/api/directions';
 
 /* ══════════════════════════════
    저장소 헬퍼
@@ -266,7 +260,7 @@ function save(key, val) { localStorage.setItem(key, JSON.stringify(val)); }
 let groups = load('mygolf_groups', []);
 let selectedGroupId = load('mygolf_selectedGroup', null);
 let visited = load('mygolf_visited', {});
-let settings = load('mygolf_settings', { kakaoKey: '', timeSlot: 'morning', sortMode: 'minimax', typeFilter: 'all' });
+let settings = load('mygolf_settings', { timeSlot: 'morning', sortMode: 'minimax', typeFilter: 'all' });
 let geoCache = load('mygolf_geo', {});
 let travelCache = load('mygolf_travel', {});
 
@@ -524,19 +518,12 @@ function saveGroup() {
    설정 시트
 ══════════════════════════════ */
 function openSettingsSheet() {
-  document.getElementById('kakaoKeyInput').value = settings.kakaoKey || '';
   updateCacheStats();
   openSheet(document.getElementById('settingsSheet'));
 }
 function updateCacheStats() {
   document.getElementById('statGeo').textContent = Object.keys(geoCache).length + '개';
   document.getElementById('statTravel').textContent = Object.keys(travelCache).length + '건';
-}
-function saveSettings() {
-  settings.kakaoKey = document.getElementById('kakaoKeyInput').value.trim();
-  save('mygolf_settings', settings);
-  closeAllSheets();
-  toast('설정을 저장했습니다');
 }
 function clearAllCache() {
   geoCache = {}; travelCache = {};
@@ -548,41 +535,27 @@ function clearAllCache() {
 }
 
 /* ══════════════════════════════
-   카카오 API
+   카카오 API (Cloudflare Pages Functions 프록시 경유 — 키는 서버에만 존재)
 ══════════════════════════════ */
-function kakaoHeaders() {
-  return { Authorization: 'KakaoAK ' + settings.kakaoKey };
-}
 async function kakaoGeocode(query) {
   const key = normAddrKey(query);
   if (geoCache[key]) return geoCache[key];
-  // 주소 검색 우선 시도
-  let res = await fetch(`${KAKAO_ADDR_URL}?query=${encodeURIComponent(query)}`, { headers: kakaoHeaders() });
-  let data = await res.json();
-  let doc = data.documents && data.documents[0];
-  if (!doc) {
-    // 실패 시 키워드 검색으로 폴백 (분당 기준 반경 우선 정렬)
-    res = await fetch(`${KAKAO_LOCAL_URL}?query=${encodeURIComponent(query)}&x=${BUNDANG.lng}&y=${BUNDANG.lat}&radius=50000`, { headers: kakaoHeaders() });
-    data = await res.json();
-    doc = data.documents && data.documents[0];
-  }
-  if (!doc) return null;
-  const lat = parseFloat(doc.y || (doc.address && doc.address.y));
-  const lng = parseFloat(doc.x || (doc.address && doc.address.x));
-  const address = doc.address_name || doc.road_address_name || query;
-  const result = { lat, lng, address, ts: Date.now() };
+  const res = await fetch(`${GEOCODE_API}?q=${encodeURIComponent(query)}`);
+  const data = await res.json();
+  if (data.error === 'server_not_configured') throw new Error('SERVER_NOT_CONFIGURED');
+  if (!res.ok || data.error) return null;
+  const result = { lat: data.lat, lng: data.lng, address: data.address, ts: Date.now() };
   geoCache[key] = result;
   save('mygolf_geo', geoCache);
   return result;
 }
 async function kakaoDirections(originLat, originLng, destLat, destLng) {
-  const url = `${KAKAO_DIRECTIONS_URL}?origin=${originLng},${originLat}&destination=${destLng},${destLat}&priority=RECOMMEND`;
-  const res = await fetch(url, { headers: kakaoHeaders() });
+  const url = `${DIRECTIONS_API}?origin=${originLat},${originLng}&destination=${destLat},${destLng}`;
+  const res = await fetch(url);
   const data = await res.json();
-  const route = data.routes && data.routes[0];
-  if (!route || route.result_code !== 0) return null;
-  const s = route.summary;
-  return { min: Math.round(s.duration / 60), km: Math.round(s.distance / 100) / 10 };
+  if (data.error === 'server_not_configured') throw new Error('SERVER_NOT_CONFIGURED');
+  if (!res.ok || data.error) return null;
+  return { min: data.min, km: data.km };
 }
 
 /* ══════════════════════════════
@@ -665,7 +638,6 @@ function setSortMode(k) { settings.sortMode = k; save('mygolf_settings', setting
 function setTypeFilter(k) { settings.typeFilter = k; save('mygolf_settings', settings); renderCandidatesTab(); }
 
 async function runCalculation() {
-  if (!settings.kakaoKey) { toast('설정에서 Kakao API 키를 먼저 입력하세요'); openSettingsSheet(); return; }
   const group = groups.find(g => g.id === selectedGroupId);
   if (!group) { toast('모임을 먼저 선택하세요'); return; }
 
@@ -683,7 +655,7 @@ async function runCalculation() {
       try {
         const g = await kakaoGeocode(`${c.region} ${c.name}`);
         if (g) { c.lat = g.lat; c.lng = g.lng; c.address = g.address; geoCache['course:' + c.id] = g; save('mygolf_geo', geoCache); }
-      } catch (e) { /* 개별 실패는 건너뜀 */ }
+      } catch (e) { if (e.message === 'SERVER_NOT_CONFIGURED') throw e; /* 개별 실패는 건너뜀 */ }
       await sleep(80);
     }
 
@@ -692,7 +664,7 @@ async function runCalculation() {
     const filtered = withDist.filter(c => c.distFromBundang <= STRAIGHT_LINE_RADIUS_KM);
 
     if (filtered.length === 0) {
-      toast('반경 내 골프장을 찾지 못했습니다. Kakao 키 설정을 확인하세요');
+      toast('반경 내 골프장을 찾지 못했습니다. 잠시 후 다시 시도해주세요');
       return;
     }
 
@@ -702,7 +674,7 @@ async function runCalculation() {
       const key = normAddrKey(m.addr);
       if (!geoCache[key]) {
         progress.textContent = `동행자 위치 확인 중 (${i + 1}/${group.members.length})`;
-        try { await kakaoGeocode(m.addr); } catch (e) { /* skip */ }
+        try { await kakaoGeocode(m.addr); } catch (e) { if (e.message === 'SERVER_NOT_CONFIGURED') throw e; /* skip */ }
         await sleep(80);
       }
     }
@@ -727,6 +699,7 @@ async function runCalculation() {
             travelCache[tKey] = r ? { min: r.min, km: r.km, ts: Date.now() } : { failed: true, ts: Date.now() };
             save('mygolf_travel', travelCache);
           } catch (e) {
+            if (e.message === 'SERVER_NOT_CONFIGURED') throw e;
             travelCache[tKey] = { failed: true, ts: Date.now() };
           }
           await sleep(80);
@@ -750,7 +723,8 @@ async function runCalculation() {
     renderCandidatesTab();
     toast('계산이 완료되었습니다');
   } catch (e) {
-    toast('계산 중 오류가 발생했습니다: ' + e.message);
+    if (e.message === 'SERVER_NOT_CONFIGURED') toast('서버에 Kakao API 키가 설정되지 않았습니다. 관리자에게 문의하세요');
+    else toast('계산 중 오류가 발생했습니다: ' + e.message);
   } finally {
     btn.disabled = false;
     progress.classList.add('hidden');

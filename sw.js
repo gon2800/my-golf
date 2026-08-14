@@ -1,4 +1,4 @@
-const CACHE_NAME = 'my-golf-v1';
+const CACHE_NAME = 'my-golf-v2';
 const ASSETS = [
   '/',
   '/index.html',
@@ -25,8 +25,8 @@ self.addEventListener('activate', e => {
 });
 
 self.addEventListener('fetch', e => {
-  // 카카오 API는 캐시하지 않음 (항상 최신 응답 필요, 앱 자체 캐시로 관리)
-  if (e.request.url.includes('kakao.com') || e.request.url.includes('kakaomobility.com')) return;
+  // Pages Functions API는 캐시하지 않음 (항상 최신 응답 필요, 앱 자체 캐시로 관리)
+  if (new URL(e.request.url).pathname.startsWith('/api/')) return;
 
   e.respondWith(
     caches.match(e.request).then(cached => {

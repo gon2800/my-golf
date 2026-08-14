@@ -11,6 +11,7 @@
 <link rel="apple-touch-icon" href="/icons/icon-192.png">
 <title>My Golf</title>
 <style>
+@import url('https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.19.0/dist/tabler-icons.min.css');
 :root{
   --bg:#F5F6FB; --card:#FFFFFF; --ink:#1F2437; --sub:#7A809A;
   --line:#EBEDF4; --line-strong:#D3D8E6; --accent:#5B54E8; --accent-dark:#4C46D6; --accent-soft:#EEEDFD;
@@ -64,7 +65,7 @@ body{font-family:-apple-system,"Apple SD Gothic Neo","Noto Sans KR","Malgun Goth
 .btn-secondary.on{background:var(--accent-soft);color:var(--accent);border-color:var(--accent);}
 .icon-btn{width:34px;height:34px;border-radius:9px;border:none;background:var(--danger-soft);color:var(--danger);font-size:15px;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
 .icon-btn.neutral{background:var(--bg);color:var(--sub);}
-.icon-btn.labeled{width:auto;padding:0 10px;gap:4px;font-size:12px;font-weight:700;}
+.icon-btn.labeled{width:auto;padding:0 10px;gap:4px;font-size:12px;font-weight:700;flex-shrink:0;white-space:nowrap;}
 
 /* ── 입력 필드 ── */
 .field-row{margin-bottom:12px;}
@@ -135,8 +136,6 @@ body{font-family:-apple-system,"Apple SD Gothic Neo","Noto Sans KR","Malgun Goth
 .cache-stat:last-of-type{border-bottom:none;}
 
 .hidden{display:none !important;}
-
-@import url('https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.19.0/dist/tabler-icons.min.css');
 </style>
 </head>
 <body>
@@ -188,6 +187,10 @@ body{font-family:-apple-system,"Apple SD Gothic Neo","Noto Sans KR","Malgun Goth
     <label>모임 이름</label>
     <input id="groupNameInput" type="text" placeholder="예: 주말 라운딩">
   </div>
+  <div class="field-row">
+    <label>예정 날짜 (선택)</label>
+    <input id="groupDateInput" type="date">
+  </div>
   <div class="ctrl-label" style="margin-top:0;">동행자</div>
   <div id="memberRowsWrap"></div>
   <button class="add-member-btn" onclick="addMemberRow()" type="button"><i class="ti ti-plus"></i>동행자 추가</button>
@@ -220,6 +223,10 @@ body{font-family:-apple-system,"Apple SD Gothic Neo","Noto Sans KR","Malgun Goth
     <button class="btn-secondary" id="courseDetailVisitBtn"><i class="ti ti-check"></i>방문 체크</button>
     <button class="btn-secondary" id="courseDetailKakaoBtn"><i class="ti ti-external-link"></i>카카오골프예약</button>
   </div>
+  <div class="settings-help" style="margin:8px 0 0;">
+    방문 체크: 다녀온 골프장으로 기록해요. 이력 탭에서 모아볼 수 있어요.
+  </div>
+  <div class="settings-help" id="courseDetailDateHint" style="margin:2px 0 0;"></div>
 </div>
 
 <div id="overlay" onclick="closeAllSheets()"></div>
@@ -456,13 +463,22 @@ function renderGroupList() {
           <button class="icon-btn labeled" onclick="event.stopPropagation();deleteGroup('${g.id}')"><i class="ti ti-trash"></i>삭제</button>
         </div>
       </div>
-      <div class="group-members">${g.members.length}명 · ${escapeHtml(preview)}</div>
+      <div class="group-members">${g.members.length}명 · ${escapeHtml(preview)}${g.scheduledDate ? ` · 예정일 ${formatDateShort(g.scheduledDate)}` : ''}</div>
     </div>`;
   }).join('');
 }
 
 function escapeHtml(s) {
   return String(s || '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
+function formatDateShort(isoDate) { // "YYYY-MM-DD" -> "M/D"
+  if (!isoDate) return '';
+  const [, m, d] = isoDate.split('-');
+  return `${parseInt(m, 10)}/${parseInt(d, 10)}`;
+}
+function dateToYYYYMMDD(isoDate) { // "YYYY-MM-DD" -> "YYYYMMDD"
+  return isoDate ? isoDate.replace(/-/g, '') : null;
 }
 
 function selectGroup(id) {
@@ -488,6 +504,7 @@ function openGroupSheet(id) {
   const g = id ? groups.find(x => x.id === id) : null;
   document.getElementById('groupSheetTitle').textContent = g ? '모임 수정' : '모임 만들기';
   document.getElementById('groupNameInput').value = g ? g.name : '';
+  document.getElementById('groupDateInput').value = g ? (g.scheduledDate || '') : '';
   const wrap = document.getElementById('memberRowsWrap');
   wrap.innerHTML = '';
   const members = g ? g.members : [{ name: '', addr: '' }, { name: '', addr: '' }];
@@ -502,7 +519,7 @@ function addMemberRow(name = '', addr = '') {
   row.innerHTML = `
     <input class="member-name-input" type="text" placeholder="이름" value="${escapeHtml(name)}">
     <input class="member-addr-input" type="text" placeholder="동네 (예: 성남시 분당구 정자동)" value="${escapeHtml(addr)}">
-    <button class="icon-btn" type="button" onclick="this.parentElement.remove()"><i class="ti ti-x"></i></button>
+    <button class="icon-btn labeled" type="button" onclick="this.parentElement.remove()"><i class="ti ti-trash"></i>삭제</button>
   `;
   wrap.appendChild(row);
 }
@@ -510,6 +527,7 @@ function addMemberRow(name = '', addr = '') {
 function saveGroup() {
   const name = document.getElementById('groupNameInput').value.trim();
   if (!name) { toast('모임 이름을 입력하세요'); return; }
+  const scheduledDate = document.getElementById('groupDateInput').value || null; // "YYYY-MM-DD" 또는 null
   const rows = [...document.querySelectorAll('#memberRowsWrap .member-row')];
   const members = rows.map(r => {
     const [nameEl, addrEl] = r.querySelectorAll('input');
@@ -520,9 +538,9 @@ function saveGroup() {
   let group;
   if (editingGroupId) {
     group = groups.find(x => x.id === editingGroupId);
-    group.name = name; group.members = members;
+    group.name = name; group.members = members; group.scheduledDate = scheduledDate;
   } else {
-    group = { id: uid(), name, members };
+    group = { id: uid(), name, members, scheduledDate };
     groups.push(group);
   }
   save('mygolf_groups', groups);
@@ -645,7 +663,7 @@ function renderReviewBody() {
   body.innerHTML = `
     <div class="tab-card">
       <div class="ctrl-label" style="margin-top:0;">선택된 모임</div>
-      <div class="course-summary" style="margin-bottom:12px;"><b>${escapeHtml(group.name)}</b> · ${group.members.length}명</div>
+      <div class="course-summary" style="margin-bottom:12px;"><b>${escapeHtml(group.name)}</b> · ${group.members.length}명${group.scheduledDate ? ` · 예정일 ${formatDateShort(group.scheduledDate)}` : ''}</div>
 
       <div class="ctrl-label">시설 구분</div>
       <div class="segment" id="facilitySeg">
@@ -845,6 +863,7 @@ function openCourseDetailSheet(courseId) {
   const c = COURSES.find(x => x.id === courseId);
   if (!c) return;
   const isVisited = !!visited[c.id];
+  const group = groups.find(g => g.id === selectedGroupId);
   document.getElementById('courseDetailTitle').textContent = c.name;
   document.getElementById('courseDetailAddr').textContent = c.address || c.region;
   const badge = document.getElementById('courseDetailBadge');
@@ -854,7 +873,15 @@ function openCourseDetailSheet(courseId) {
   visitBtn.className = 'btn-secondary' + (isVisited ? ' on' : '');
   visitBtn.innerHTML = `<i class="ti ti-check"></i>${isVisited ? '방문함' : '방문 체크'}`;
   visitBtn.onclick = () => { toggleVisited(c.id); openCourseDetailSheet(c.id); };
-  document.getElementById('courseDetailKakaoBtn').onclick = () => openKakaoGolf(c.id);
+  const kakaoBtn = document.getElementById('courseDetailKakaoBtn');
+  kakaoBtn.innerHTML = c.kakaoGolfId
+    ? '<i class="ti ti-external-link"></i>카카오골프예약 바로가기'
+    : '<i class="ti ti-external-link"></i>카카오골프예약';
+  kakaoBtn.onclick = () => openKakaoGolf(c.id);
+  const dateHint = document.getElementById('courseDetailDateHint');
+  dateHint.textContent = (c.kakaoGolfId && group && group.scheduledDate)
+    ? `예정일(${formatDateShort(group.scheduledDate)}) 기준 예약 현황으로 바로 이동해요.`
+    : (c.kakaoGolfId ? '카카오골프예약에서 이 골프장 페이지로 바로 이동해요.' : '카카오골프예약 검색 결과로 이동해요.');
   openSheet(document.getElementById('courseDetailSheet'));
 }
 
@@ -867,6 +894,15 @@ function toggleVisited(courseId) {
 function openKakaoGolf(courseId) {
   const c = COURSES.find(x => x.id === courseId);
   if (!c) return;
+
+  if (c.kakaoGolfId) {
+    const group = groups.find(g => g.id === selectedGroupId);
+    const dateParam = group && group.scheduledDate ? `?date=${dateToYYYYMMDD(group.scheduledDate)}` : '';
+    window.open(`https://www.kakao.golf/golf/${c.kakaoGolfId}${dateParam}`, '_blank');
+    return;
+  }
+
+  // ID 매칭이 안 된 골프장은 이름 검색으로 폴백
   if (navigator.clipboard) {
     navigator.clipboard.writeText(c.name).catch(() => {});
   }
@@ -881,7 +917,7 @@ function renderHistory() {
   const wrap = document.getElementById('historyListWrap');
   const entries = Object.entries(visited);
   if (entries.length === 0) {
-    wrap.innerHTML = `<div class="empty-state"><i class="ti ti-history"></i>아직 방문 기록이 없어요<br>후보 탭에서 다녀온 골프장을 체크해보세요</div>`;
+    wrap.innerHTML = `<div class="empty-state"><i class="ti ti-history"></i>아직 방문 기록이 없어요<br>검토하기 탭에서 다녀온 골프장을 체크해보세요</div>`;
     return;
   }
   const rows = entries.map(([id, v]) => {
@@ -894,7 +930,7 @@ function renderHistory() {
       <div class="group-card-top">
         <div class="group-name">${escapeHtml(c.name)}</div>
         <div class="group-actions">
-          <button class="icon-btn" onclick="toggleVisited('${c.id}');renderHistory();"><i class="ti ti-x"></i></button>
+          <button class="icon-btn labeled" onclick="toggleVisited('${c.id}');renderHistory();"><i class="ti ti-x"></i>삭제</button>
         </div>
       </div>
       <div class="group-members">${escapeHtml(c.region || '')} · 방문일 ${v.date}</div>

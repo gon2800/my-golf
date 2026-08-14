@@ -54,7 +54,6 @@ body{font-family:-apple-system,"Apple SD Gothic Neo","Noto Sans KR","Malgun Goth
 .tab-card + .tab-card{margin-top:12px;}
 .tab-card.corner-first{border-radius:0 var(--radius) var(--radius) var(--radius);}
 .tab-card.corner-last{border-radius:var(--radius) 0 var(--radius) var(--radius);}
-.tab-card.compact{padding-bottom:16px;min-height:0;}
 
 /* ── 버튼 ── */
 .btn-primary{width:100%;height:46px;border-radius:14px;background:var(--accent);color:#fff;border:none;font-size:16px;font-weight:700;}
@@ -65,8 +64,7 @@ body{font-family:-apple-system,"Apple SD Gothic Neo","Noto Sans KR","Malgun Goth
 .btn-secondary.on{background:var(--accent-soft);color:var(--accent);border-color:var(--accent);}
 .icon-btn{width:34px;height:34px;border-radius:9px;border:none;background:var(--danger-soft);color:var(--danger);font-size:15px;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
 .icon-btn.neutral{background:var(--bg);color:var(--sub);}
-.fab{position:absolute;bottom:16px;right:16px;width:44px;height:44px;background:var(--accent);border:none;border-radius:50%;color:#fff;box-shadow:0 2px 8px rgba(91,86,200,.4);font-size:22px;display:flex;align-items:center;justify-content:center;}
-.fab:active{background:var(--accent-dark);}
+.icon-btn.labeled{width:auto;padding:0 10px;gap:4px;font-size:12px;font-weight:700;}
 
 /* ── 입력 필드 ── */
 .field-row{margin-bottom:12px;}
@@ -104,12 +102,7 @@ body{font-family:-apple-system,"Apple SD Gothic Neo","Noto Sans KR","Malgun Goth
 .member-addr-input{flex:1.4 !important;}
 .add-member-btn{width:100%;height:38px;border-radius:10px;background:var(--accent-soft);color:var(--accent);border:none;font-size:13px;font-weight:700;margin:2px 0 16px;display:flex;align-items:center;justify-content:center;gap:5px;}
 
-/* ══ 후보 탭 ══ */
-.chip-row{display:flex;gap:7px;overflow-x:auto;padding-bottom:2px;}
-.chip-row::-webkit-scrollbar{display:none;}
-.group-chip{flex-shrink:0;padding:8px 14px;border-radius:20px;background:var(--bg);border:1.5px solid var(--line);font-size:13px;font-weight:700;color:var(--sub);white-space:nowrap;}
-.group-chip.active{background:var(--accent);border-color:var(--accent);color:#fff;}
-
+/* ══ 검토하기 탭 ══ */
 .ctrl-label{font-size:11px;font-weight:700;color:var(--sub);margin:14px 0 6px;}
 .ctrl-label:first-child{margin-top:0;}
 .segment{display:flex;gap:4px;background:var(--bg);border-radius:11px;padding:3px;}
@@ -156,32 +149,23 @@ body{font-family:-apple-system,"Apple SD Gothic Neo","Noto Sans KR","Malgun Goth
   </div>
 
   <div class="tab-bar">
-    <div class="tab-item active" onclick="switchTab('group')"><i class="ti ti-users"></i>모임</div>
-    <div class="tab-item" onclick="switchTab('candidates')"><i class="ti ti-map-pin"></i>후보</div>
+    <div class="tab-item active" onclick="switchTab('review')"><i class="ti ti-clipboard-check"></i>검토하기</div>
     <div class="tab-item" onclick="switchTab('history')"><i class="ti ti-history"></i>이력</div>
   </div>
 
   <div class="screens">
-    <!-- ═══ 모임 ═══ -->
-    <div id="screen-group" class="screen active">
+    <!-- ═══ 검토하기 ═══ -->
+    <div id="screen-review" class="screen active">
       <div class="tab-card corner-first">
         <div id="groupListWrap"></div>
-      </div>
-      <button class="fab" onclick="openGroupSheet()"><i class="ti ti-plus"></i></button>
-    </div>
-
-    <!-- ═══ 후보 ═══ -->
-    <div id="screen-candidates" class="screen">
-      <div class="tab-card compact">
-        <div class="ctrl-label">모임 선택</div>
-        <div class="chip-row" id="groupChipRow"></div>
+        <button class="add-member-btn" style="margin-top:10px;" onclick="openGroupSheet()" type="button"><i class="ti ti-plus"></i>새 모임 만들기</button>
       </div>
 
-      <div id="candidatesBody">
+      <div id="reviewBody">
         <div class="tab-card">
           <div class="empty-state">
             <i class="ti ti-map-pin-off"></i>
-            모임 탭에서 모임을 먼저 만들고<br>선택해주세요
+            위에서 모임을 선택하거나<br>새로 만들어 후보를 찾아보세요
           </div>
         </div>
       </div>
@@ -298,8 +282,8 @@ let kakaoMapsLoadPromise = null;
 /* ══════════════════════════════
    탭 전환
 ══════════════════════════════ */
-const TABS = ['group', 'candidates', 'history'];
-let currentTab = 'group';
+const TABS = ['review', 'history'];
+let currentTab = 'review';
 let tabSwitching = false;
 function switchTab(t) {
   if (t === currentTab || tabSwitching) return;
@@ -327,7 +311,7 @@ function switchTab(t) {
 
   // 지도(카카오맵)는 컨테이너가 display:none인 상태에서 생성하면 크기를 0으로 읽어
   // 깨지므로, 화면이 .active(display:block)가 된 뒤에 렌더링한다.
-  if (t === 'candidates') renderCandidatesTab();
+  if (t === 'review') renderReviewBody();
   if (t === 'history') renderHistory();
 
   void newScreen.offsetWidth;
@@ -457,7 +441,7 @@ function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 function renderGroupList() {
   const wrap = document.getElementById('groupListWrap');
   if (groups.length === 0) {
-    wrap.innerHTML = `<div class="empty-state"><i class="ti ti-users"></i>아직 모임이 없어요<br>오른쪽 아래 + 버튼으로 만들어보세요</div>`;
+    wrap.innerHTML = `<div class="empty-state"><i class="ti ti-users"></i>아직 모임이 없어요<br>아래 '새 모임 만들기' 버튼으로 만들어보세요</div>`;
     return;
   }
   wrap.innerHTML = groups.map(g => {
@@ -468,8 +452,8 @@ function renderGroupList() {
       <div class="group-card-top">
         <div class="group-name">${escapeHtml(g.name)}</div>
         <div class="group-actions">
-          <button class="icon-btn neutral" onclick="event.stopPropagation();openGroupSheet('${g.id}')"><i class="ti ti-pencil"></i></button>
-          <button class="icon-btn" onclick="event.stopPropagation();deleteGroup('${g.id}')"><i class="ti ti-trash"></i></button>
+          <button class="icon-btn neutral labeled" onclick="event.stopPropagation();openGroupSheet('${g.id}')"><i class="ti ti-pencil"></i>수정</button>
+          <button class="icon-btn labeled" onclick="event.stopPropagation();deleteGroup('${g.id}')"><i class="ti ti-trash"></i>삭제</button>
         </div>
       </div>
       <div class="group-members">${g.members.length}명 · ${escapeHtml(preview)}</div>
@@ -485,7 +469,8 @@ function selectGroup(id) {
   selectedGroupId = id;
   save('mygolf_selectedGroup', selectedGroupId);
   renderGroupList();
-  switchTab('candidates');
+  renderReviewBody();
+  document.getElementById('reviewBody').scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
 function deleteGroup(id) {
@@ -493,6 +478,7 @@ function deleteGroup(id) {
   save('mygolf_groups', groups);
   if (selectedGroupId === id) { selectedGroupId = null; save('mygolf_selectedGroup', null); }
   renderGroupList();
+  renderReviewBody();
   toast('모임을 삭제했습니다');
 }
 
@@ -531,16 +517,20 @@ function saveGroup() {
   }).filter(m => m.name && m.addr);
   if (members.length === 0) { toast('동행자를 1명 이상 입력하세요'); return; }
 
+  let group;
   if (editingGroupId) {
-    const g = groups.find(x => x.id === editingGroupId);
-    g.name = name; g.members = members;
+    group = groups.find(x => x.id === editingGroupId);
+    group.name = name; group.members = members;
   } else {
-    groups.push({ id: uid(), name, members });
+    group = { id: uid(), name, members };
+    groups.push(group);
   }
   save('mygolf_groups', groups);
+  selectedGroupId = group.id;
+  save('mygolf_selectedGroup', selectedGroupId);
   closeAllSheets();
   renderGroupList();
-  renderGroupChips();
+  renderReviewBody();
   toast('저장되었습니다');
 }
 
@@ -639,26 +629,14 @@ function buildMemberLabels(members) {
 }
 
 /* ══════════════════════════════
-   후보 탭
+   검토하기 탭 (모임 선택/생성 → 후보 찾기 → 지도+결과)
 ══════════════════════════════ */
-function renderGroupChips() {
-  const row = document.getElementById('groupChipRow');
-  if (groups.length === 0) {
-    row.innerHTML = `<span style="font-size:12px;color:var(--sub);">모임을 먼저 만들어주세요</span>`;
-    return;
-  }
-  row.innerHTML = groups.map(g =>
-    `<div class="group-chip ${g.id === selectedGroupId ? 'active' : ''}" onclick="selectGroup('${g.id}')">${escapeHtml(g.name)}</div>`
-  ).join('');
-}
-
-function renderCandidatesTab() {
-  renderGroupChips();
-  const body = document.getElementById('candidatesBody');
+function renderReviewBody() {
+  const body = document.getElementById('reviewBody');
   const group = groups.find(g => g.id === selectedGroupId);
 
   if (!group) {
-    body.innerHTML = `<div class="tab-card"><div class="empty-state"><i class="ti ti-map-pin-off"></i>모임 탭에서 모임을 먼저 만들고<br>선택해주세요</div></div>`;
+    body.innerHTML = `<div class="tab-card"><div class="empty-state"><i class="ti ti-map-pin-off"></i>위에서 모임을 선택하거나<br>새로 만들어 후보를 찾아보세요</div></div>`;
     return;
   }
 
@@ -666,7 +644,10 @@ function renderCandidatesTab() {
 
   body.innerHTML = `
     <div class="tab-card">
-      <div class="ctrl-label" style="margin-top:0;">시설 구분</div>
+      <div class="ctrl-label" style="margin-top:0;">선택된 모임</div>
+      <div class="course-summary" style="margin-bottom:12px;"><b>${escapeHtml(group.name)}</b> · ${group.members.length}명</div>
+
+      <div class="ctrl-label">시설 구분</div>
       <div class="segment" id="facilitySeg">
         <div class="segment-item ${settings.typeFilter === 'all' ? 'active' : ''}" data-v="all" onclick="setTypeFilter('all')">전체</div>
         <div class="segment-item ${settings.typeFilter === '회원제' ? 'active' : ''}" data-v="회원제" onclick="setTypeFilter('회원제')">회원제</div>
@@ -675,7 +656,7 @@ function renderCandidatesTab() {
 
       <div class="calc-btn-row">
         <button class="btn-primary" id="calcBtn" onclick="findCandidates()">
-          <i class="ti ti-search" style="vertical-align:-2px;"></i> ${hasData ? '후보 다시 찾기' : '골프장 후보 찾기'}
+          <i class="ti ti-search" style="vertical-align:-2px;"></i> ${hasData ? '후보 다시 찾기' : '후보 찾기'}
         </button>
         <div class="calc-progress hidden" id="calcProgress"></div>
       </div>
@@ -689,7 +670,7 @@ function renderCandidatesTab() {
              <span><span class="map-legend-dot" style="background:#2E9E5B;"></span>동행자</span>
              <span><span class="map-legend-dot" style="background:var(--accent);"></span>골프장 후보</span>
            </div>`
-        : `<div class="empty-state"><i class="ti ti-map-pin"></i>"골프장 후보 찾기"를 눌러<br>지도에서 후보를 확인해보세요</div>`
+        : `<div class="empty-state"><i class="ti ti-map-pin"></i>"후보 찾기"를 눌러<br>지도에서 후보를 확인해보세요</div>`
       }
     </div>
   `;
@@ -782,7 +763,7 @@ async function findCandidates() {
     }
 
     lastComputed = { groupId: group.id, courses: filtered, membersGeo, usedTimeH: timeH, usedRadiusKm: Math.round(radiusKm) };
-    renderCandidatesTab();
+    renderReviewBody();
     toast(`후보 ${filtered.length}곳을 찾았습니다`);
   } catch (e) {
     if (e.message === 'SERVER_NOT_CONFIGURED') toast('서버에 Kakao API 키가 설정되지 않았습니다. 관리자에게 문의하세요');
@@ -926,9 +907,8 @@ function renderHistory() {
 ══════════════════════════════ */
 (async function boot() {
   renderGroupList();
-  renderGroupChips();
+  renderReviewBody();
   await loadCourses();
-  if (currentTab === 'candidates') renderCandidatesTab();
 })();
 
 if ('serviceWorker' in navigator && location.protocol !== 'file:') {
